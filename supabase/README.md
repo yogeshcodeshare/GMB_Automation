@@ -6,7 +6,8 @@ DDL, so the two migrations are applied once by hand (2 minutes):
 1. Open the project → **SQL Editor** → New query.
 2. Paste the full contents of `migrations/20260712000001_init_schema.sql` → **Run**.
 3. Paste the full contents of `migrations/20260712000002_seed.sql` → **Run**.
-4. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
+4. Paste the full contents of `migrations/20260712000003_spend_functions.sql` → **Run**.
+5. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
 
 Then create the founder login (once):
 

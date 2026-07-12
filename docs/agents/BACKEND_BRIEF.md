@@ -35,6 +35,10 @@ never edit `app/(dashboard)`, `app/public`, `components`, `src/types`, `supabase
   rented-subdomain (grexa.site) · review stats (30 reviews, 4.9★, 0 photos, 1 Local
   Guide, velocity ~1.2/mo). Suggested per-row target (matches seed):
   10/0/7/4/5/3/1/2/6/3 = 41.
+  *Source note:* the post-stat targets (7 posts, 1/293 days, 171 avg chars, 4 with
+  image, 1 with link) come from blueprint §1.3d and the seed `posts_cache` rows — the
+  founder's Post Audit export exists only as a PNG, so they are NOT derivable from
+  `fixtures/*.md`; assert them against constants/seed, not the fixture parser output.
 - **Day 3 — M1.5 + M2** — website crawler + PSI + renormalisation (EP-014) · grid
   generator/batcher/poller/rank-extractor (EP-003/004), teleport, history + compare,
   cost <₹5 per 5×5.

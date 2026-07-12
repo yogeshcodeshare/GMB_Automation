@@ -132,6 +132,66 @@ describe("SpendGuard — cap enforcement (EP-012)", () => {
   });
 });
 
+describe("SpendGuard — atomic reservation semantics (M0 review hardening)", () => {
+  it("getStatus reports blocked=true and remaining 0 at/over the cap", async () => {
+    const { guard } = makeGuard({ settingsCap: 1.0 });
+    await guard.record({ endpoint: "serp/google/maps", cost_usd: 1.0 });
+    const status = await guard.getStatus();
+    expect(status.blocked).toBe(true);
+    expect(status.remaining_usd).toBe(0);
+  });
+
+  it("getStatus reports remaining = cap - spent under the cap", async () => {
+    const { guard } = makeGuard({ settingsCap: 1.0 });
+    await guard.record({ endpoint: "serp/google/maps", cost_usd: 0.25 });
+    const status = await guard.getStatus();
+    expect(status.blocked).toBe(false);
+    expect(status.remaining_usd).toBeCloseTo(0.75, 9);
+  });
+
+  it("settles the ledger with the ACTUAL cost, not the estimate", async () => {
+    const { guard, store } = makeGuard({ settingsCap: 1.0 });
+    await guard.guarded("business_data/google/reviews", 0.01, async () => ({
+      result: "ok",
+      actualCostUsd: 0.002,
+      taskId: "task-9",
+    }));
+    expect(store.entries).toHaveLength(1);
+    expect(store.entries[0].cost_usd).toBe(0.002);
+    expect(store.entries[0].endpoint).toBe("business_data/google/reviews");
+    expect(store.entries[0].task_id).toBe("task-9");
+  });
+
+  it("concurrent guarded calls cannot overshoot the cap (TOCTOU fix)", async () => {
+    const { guard, store } = makeGuard({ settingsCap: 1.0 });
+    await guard.record({ endpoint: "seed", cost_usd: 0.9 });
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, () =>
+        guard.guarded("serp/google/maps", 0.09, async () => ({
+          result: 1,
+          actualCostUsd: 0.09,
+        }))
+      )
+    );
+    const fulfilled = results.filter((r) => r.status === "fulfilled").length;
+    expect(fulfilled).toBe(1); // only one reservation fits under the cap
+    const total = store.entries.reduce((s, e) => s + e.cost_usd, 0);
+    expect(total).toBeLessThanOrEqual(1.0 + 1e-9);
+  });
+
+  it("a failed run keeps the conservative estimate on the ledger", async () => {
+    const { guard, store } = makeGuard({ settingsCap: 1.0 });
+    await expect(
+      guard.guarded("serp/google/maps", 0.015, async () => {
+        throw new Error("upstream timeout after POST");
+      })
+    ).rejects.toThrow("upstream timeout");
+    expect(store.entries).toHaveLength(1);
+    expect(store.entries[0].cost_usd).toBe(0.015); // vendor may have billed
+    expect(store.entries[0].endpoint).toBe("serp/google/maps (failed)");
+  });
+});
+
 describe("SpendGuard — day rollover", () => {
   it("yesterday's spend does not count toward today's cap", async () => {
     const store = new InMemorySpendStore(

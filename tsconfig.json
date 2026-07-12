@@ -14,6 +14,7 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
+      "@/types": ["./src/types/index.ts"],
       "@/components/*": ["./components/*"],
       "@/lib/*": ["./src/lib/*"],
       "@/server/*": ["./src/server/*"],

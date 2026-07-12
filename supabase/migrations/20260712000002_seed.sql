@@ -45,6 +45,14 @@ values
    'https://elegancekarad.example.in', false, null, null, 'none', null, null)
 on conflict (id) do nothing;
 
+-- ---------- TB-009 gbp_connections ----------
+-- Sentinel rows so the two 'oauth' businesses aren't dangling (P11 connections
+-- list, M6 publish paths). Tokens are OBVIOUSLY FAKE placeholders, not secrets.
+insert into public.gbp_connections (business_id, refresh_token, scopes, connected_at) values
+  ('22222222-2222-4222-8222-222222222222', 'demo-encrypted-token-not-real', array['https://www.googleapis.com/auth/business.manage'], '2026-06-15T10:00:00+05:30'),
+  ('33333333-3333-4333-8333-333333333333', 'demo-encrypted-token-not-real', array['https://www.googleapis.com/auth/business.manage'], '2026-06-20T10:00:00+05:30')
+on conflict (business_id) do nothing;
+
 -- ---------- TB-002 audits ----------
 -- Full fixture audit for मनोवेध (raw_snapshot distilled from fixtures/*.md),
 -- minimal audits for the other five so every dashboard row has a score.
@@ -91,7 +99,8 @@ insert into public.audits (id, business_id, raw_snapshot, competitor_ids, create
    $snap$::jsonb,
    '{}', '2026-07-08T09:12:00+05:30'),
   ('a2222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222', '{"demo": true}'::jsonb, '{}', '2026-07-10T10:00:00+05:30'),
-  ('a3333333-3333-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333', '{"demo": true}'::jsonb, '{}', '2026-07-06T11:30:00+05:30'),
+  -- (dated before the sprint below starts on 03 Jul — a baseline must exist at sprint start)
+  ('a3333333-3333-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333', '{"demo": true}'::jsonb, '{}', '2026-07-02T11:30:00+05:30'),
   ('a4444444-4444-4444-8444-444444444444', '44444444-4444-4444-8444-444444444444', '{"demo": true}'::jsonb, '{}', '2026-07-02T09:45:00+05:30'),
   ('a5555555-5555-4555-8555-555555555555', '55555555-5555-4555-8555-555555555555', '{"demo": true}'::jsonb, '{}', '2026-06-28T16:20:00+05:30'),
   ('a6666666-6666-4666-8666-666666666666', '66666666-6666-4666-8666-666666666666', '{"demo": true}'::jsonb, '{}', '2026-06-20T12:10:00+05:30')
@@ -149,19 +158,29 @@ on conflict (business_id, review_id) do nothing;
 -- ---------- TB-012 posts_cache — 7 fixture posts ----------
 -- avg chars = 1197/7 = 171 exactly · 4 with images · 1 with link · 0 video
 -- (one post per ~293 days across Q4'20 → Q3'25, matching the P7 timeline)
-insert into public.posts_cache (business_id, post_ts, text, char_count, has_media, links) values
-  ('11111111-1111-4111-8111-111111111111', '2020-11-15T10:00:00+05:30', 'मनोवेध हिप्नोक्लिनिक — संमोहन उपचाराने भीती, टेंशन आणि नैराश्यातून कायमची मुक्ती. आजच अपॉइंटमेंट घ्या.', 156, true,  0),
+insert into public.posts_cache (business_id, post_ts, text, char_count, has_media, links)
+select v.* from (values
+  ('11111111-1111-4111-8111-111111111111'::uuid, '2020-11-15T10:00:00+05:30'::timestamptz, 'मनोवेध हिप्नोक्लिनिक — संमोहन उपचाराने भीती, टेंशन आणि नैराश्यातून कायमची मुक्ती. आजच अपॉइंटमेंट घ्या.'::text, 156::integer, true,  0::integer),
   ('11111111-1111-4111-8111-111111111111', '2021-06-10T10:00:00+05:30', 'झोप न लागणे, नकारात्मक विचार, आत्मविश्वासाची कमतरता? गोळ्या-औषधांशिवाय उपचार. NLP आणि EFT तंत्राने मानसिक आरोग्य सुधारा. संपर्कासाठी प्रोफाइल पहा.', 204, true,  0),
   ('11111111-1111-4111-8111-111111111111', '2022-01-20T10:00:00+05:30', 'नवीन वर्षात नवी सुरुवात — व्यसनमुक्तीसाठी संमोहन उपचार. मोफत सल्ला.', 98,  false, 0),
   ('11111111-1111-4111-8111-111111111111', '2022-09-05T10:00:00+05:30', 'विद्यार्थ्यांसाठी खास — एकाग्रता, स्मरणशक्ती आणि अभ्यासातील प्रगतीसाठी Student Development Program. मर्यादित जागा.', 187, true,  0),
   ('11111111-1111-4111-8111-111111111111', '2023-04-18T10:00:00+05:30', 'वैवाहिक आणि कौटुंबिक समस्यांवर समुपदेशन. १५+ वर्षांचा अनुभव. आमच्या वेबसाइटला भेट द्या: https://nlp-eft.grexa.site/', 240, false, 1),
   ('11111111-1111-4111-8111-111111111111', '2024-02-02T10:00:00+05:30', 'प्राणीक हीलींग सत्रे आता उपलब्ध. आजच बुक करा.', 120, false, 0),
-  ('11111111-1111-4111-8111-111111111111', '2025-08-30T10:00:00+05:30', 'मानसिक आरोग्य हीच खरी संपत्ती. भीती, चिंता, नैराश्य — कोणत्याही समस्येसाठी मनोवेध हिप्नोक्लिनिक, कराड. अपॉइंटमेंटसाठी आजच संपर्क करा.', 192, true,  0);
+  ('11111111-1111-4111-8111-111111111111', '2025-08-30T10:00:00+05:30', 'मानसिक आरोग्य हीच खरी संपत्ती. भीती, चिंता, नैराश्य — कोणत्याही समस्येसाठी मनोवेध हिप्नोक्लिनिक, कराड. अपॉइंटमेंटसाठी आजच संपर्क करा.', 192, true,  0)
+) as v(business_id, post_ts, text, char_count, has_media, links)
+where not exists (
+  select 1 from public.posts_cache p
+  where p.business_id = '11111111-1111-4111-8111-111111111111'
+);
 
 -- ---------- TB-013 website_audits — fixture findings ----------
 -- psi_score 52 is a demo value (fixture has no PSI number); all booleans from fixtures/WebsiteAudit.md.
-insert into public.website_audits (business_id, psi_score, title_ok, meta_ok, h1_ok, schema_ok, nap_match, city_kw, checked_at) values
-  ('11111111-1111-4111-8111-111111111111', 52, true, false, false, false, false, true, '2026-07-08T09:12:00+05:30');
+insert into public.website_audits (business_id, psi_score, title_ok, meta_ok, h1_ok, schema_ok, nap_match, city_kw, checked_at)
+select '11111111-1111-4111-8111-111111111111'::uuid, 52, true, false, false, false, false, true, '2026-07-08T09:12:00+05:30'::timestamptz
+where not exists (
+  select 1 from public.website_audits w
+  where w.business_id = '11111111-1111-4111-8111-111111111111'
+);
 
 -- ---------- TB-004/005 grid scans — 3 runs, avg 7.8 → 6.1 → 4.6 ----------
 insert into public.grid_scans (id, business_id, keyword, grid_size, radius_m, status, avg_rank, cost_usd, created_at) values
@@ -178,7 +197,8 @@ select 'c1111111-1111-4111-8111-111111111101'::uuid,
        17.293499 + (2 - (i / 5)) * 0.0067380,
        74.17943009999999 + ((i % 5) - 2) * 0.0070560,
        (array[4,3,5,7,11, 3,3,4,8,13, 3,2,3,9,15, 4,5,7,12,18, 5,7,10,14,20])[i + 1]
-from generate_series(0, 24) as i;
+from generate_series(0, 24) as i
+where not exists (select 1 from public.grid_points gp where gp.scan_id = 'c1111111-1111-4111-8111-111111111101');
 
 -- June 2026 — ranks sum 152, avg 6.1:
 insert into public.grid_points (scan_id, lat, lng, rank)
@@ -186,7 +206,8 @@ select 'c1111111-1111-4111-8111-111111111102'::uuid,
        17.293499 + (2 - (i / 5)) * 0.0067380,
        74.17943009999999 + ((i % 5) - 2) * 0.0070560,
        (array[3,2,4,5,9, 2,2,3,6,11, 2,1,2,7,13, 3,3,5,10,15, 4,5,8,12,15])[i + 1]
-from generate_series(0, 24) as i;
+from generate_series(0, 24) as i
+where not exists (select 1 from public.grid_points gp where gp.scan_id = 'c1111111-1111-4111-8111-111111111102');
 
 -- July 2026 — the design-handoff P5 grid exactly (sum 116, avg 4.6):
 insert into public.grid_points (scan_id, lat, lng, rank)
@@ -194,7 +215,8 @@ select 'c1111111-1111-4111-8111-111111111103'::uuid,
        17.293499 + (2 - (i / 5)) * 0.0067380,
        74.17943009999999 + ((i % 5) - 2) * 0.0070560,
        (array[2,1,3,3,7, 1,1,2,4,9, 1,1,1,5,11, 2,2,3,8,14, 3,4,6,9,13])[i + 1]
-from generate_series(0, 24) as i;
+from generate_series(0, 24) as i
+where not exists (select 1 from public.grid_points gp where gp.scan_id = 'c1111111-1111-4111-8111-111111111103');
 
 -- ---------- TB-017/018 optimization sprint — active, day 9 (started 3 Jul) ----------
 -- On श्री डेंटल केअर (client ●, GMB Boost + WhatsApp), baselined on its audit.
@@ -208,9 +230,10 @@ on conflict (id) do nothing;
 -- 23 fix tasks per §2.7b P12 demo states.
 -- Groups derive from rubric_key (see src/types/sprint.ts):
 -- Profile 10 · Reviews 3 · Posts 1 · Website 5 (4 vendor-blocked) · Visibility 1 · Citations 3
-insert into public.fix_tasks (sprint_id, rubric_key, title, status, source, done_at, note, change_before, change_after) values
+insert into public.fix_tasks (sprint_id, rubric_key, title, status, source, done_at, note, change_before, change_after)
+select v.* from (values
   -- Profile (10)
-  ('d1111111-1111-4111-8111-111111111111', 'primary_category',    'Fix primary category',                          'done',    'audit',  '2026-07-03T12:00:00+05:30', null, 'Dentist', 'Dental clinic'),
+  ('d1111111-1111-4111-8111-111111111111'::uuid, 'primary_category'::text, 'Fix primary category'::text, 'done'::text, 'audit'::text, '2026-07-03T12:00:00+05:30'::timestamptz, null::text, 'Dentist'::text, 'Dental clinic'::text),
   ('d1111111-1111-4111-8111-111111111111', 'phone',               'Add business phone number',                     'done',    'audit',  '2026-07-03T12:20:00+05:30', null, '', '+91 90000 00033'),
   ('d1111111-1111-4111-8111-111111111111', 'hours',               'Correct opening hours',                         'done',    'audit',  '2026-07-04T10:00:00+05:30', null, 'Mon–Sun 24 hours', 'Mon–Sat 10:00–20:00, Sun closed'),
   ('d1111111-1111-4111-8111-111111111111', 'services',            'Add services list (12 dental services)',        'doing',   'audit',  null, 'AI-prefilled list approved for 8 of 12', null, null),
@@ -237,7 +260,12 @@ insert into public.fix_tasks (sprint_id, rubric_key, title, status, source, done
   -- Citations (3)
   ('d1111111-1111-4111-8111-111111111111', 'citation_justdial',   'Fix JustDial listing NAP',                      'done',    'audit',  '2026-07-09T12:00:00+05:30', null, null, null),
   ('d1111111-1111-4111-8111-111111111111', 'citation_indiamart',  'Fix IndiaMART listing NAP',                     'todo',    'audit',  null, null, null, null),
-  ('d1111111-1111-4111-8111-111111111111', 'citation_sulekha',    'Create Sulekha listing',                        'todo',    'manual', null, null, null, null);
+  ('d1111111-1111-4111-8111-111111111111', 'citation_sulekha',    'Create Sulekha listing',                        'todo',    'manual', null, null, null, null)
+) as v(sprint_id, rubric_key, title, status, source, done_at, note, change_before, change_after)
+where not exists (
+  select 1 from public.fix_tasks f
+  where f.sprint_id = 'd1111111-1111-4111-8111-111111111111'
+);
 
 -- ---------- Demo extras beyond §2.9 (P1/P9 need them on Day 5) ----------
 -- Current-month service cycles matching the design-handoff P9 quotas.
@@ -248,8 +276,13 @@ insert into public.service_cycles (business_id, month, posts_done, posts_target,
 on conflict (business_id, month) do nothing;
 
 -- 4 demo public-checker leads (2 today) for the P1 KPI card.
-insert into public.leads_public (phone, business_name, consent_ts, score_shown, report_sent, created_at) values
-  ('+919000000101', 'Shivneri Misal', '2026-07-12T09:15:00+05:30', 38, true,  '2026-07-12T09:15:00+05:30'),
+insert into public.leads_public (phone, business_name, consent_ts, score_shown, report_sent, created_at)
+select v.* from (values
+  ('+919000000101'::text, 'Shivneri Misal'::text, '2026-07-12T09:15:00+05:30'::timestamptz, 38::integer, true,  '2026-07-12T09:15:00+05:30'::timestamptz),
   ('+919000000102', 'Karad Auto Garage', '2026-07-12T11:40:00+05:30', 55, false, '2026-07-12T11:40:00+05:30'),
   ('+919000000103', 'Sneha Ladies Tailor', '2026-07-10T17:05:00+05:30', 47, true,  '2026-07-10T17:05:00+05:30'),
-  ('+919000000104', 'Om Sai Electricals', '2026-07-09T13:25:00+05:30', 62, true,  '2026-07-09T13:25:00+05:30');
+  ('+919000000104', 'Om Sai Electricals', '2026-07-09T13:25:00+05:30', 62, true,  '2026-07-09T13:25:00+05:30')
+) as v(phone, business_name, consent_ts, score_shown, report_sent, created_at)
+where not exists (
+  select 1 from public.leads_public l where l.phone = '+919000000101'
+);
