@@ -9,8 +9,9 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
+import { fileURLToPath } from "node:url";
 
-config({ path: new URL("../.env.local", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1") });
+config({ path: fileURLToPath(new URL("../.env.local", import.meta.url)) });
 
 const results = [];
 const ok = (name, detail = "") => results.push({ name, pass: true, detail });

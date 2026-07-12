@@ -23,6 +23,23 @@ function isMissingTable(message: string): boolean {
   return /relation .* does not exist|Could not find the table/i.test(message);
 }
 
+/**
+ * Anon lockout comes in two valid flavours:
+ *  - grant-layer denial (42501 permission denied — since migration 000004), or
+ *  - RLS-layer silence (no error, zero rows).
+ * Both mean anon reads nothing.
+ */
+function expectAnonReadLockout(
+  data: unknown[] | null,
+  error: { code?: string; message: string } | null,
+) {
+  if (error) {
+    expect(error.code).toBe("42501"); // permission denied — grants withheld from anon
+  } else {
+    expect(data).toEqual([]); // RLS: no policy for anon → zero rows visible
+  }
+}
+
 describe.skipIf(!hasEnv)("RLS — anon (publishable key) is locked out", () => {
   it("cannot read businesses (seeded with 6 rows)", async (ctx) => {
     const { data, error } = await anonClient().from("businesses").select("id");
@@ -30,8 +47,7 @@ describe.skipIf(!hasEnv)("RLS — anon (publishable key) is locked out", () => {
       ctx.skip(); // migrations not applied yet — run npm run test:rls after applying
       return;
     }
-    expect(error).toBeNull();
-    expect(data).toEqual([]); // RLS: no policy for anon → zero rows visible
+    expectAnonReadLockout(data, error);
   });
 
   it("cannot read spend_ledger", async (ctx) => {
@@ -40,8 +56,7 @@ describe.skipIf(!hasEnv)("RLS — anon (publishable key) is locked out", () => {
       ctx.skip();
       return;
     }
-    expect(error).toBeNull();
-    expect(data).toEqual([]);
+    expectAnonReadLockout(data, error);
   });
 
   it("cannot insert into spend_ledger", async (ctx) => {
@@ -76,8 +91,7 @@ describe.skipIf(!hasEnv)("RLS — anon (publishable key) is locked out", () => {
       ctx.skip();
       return;
     }
-    expect(error).toBeNull();
-    expect(data).toEqual([]);
+    expectAnonReadLockout(data, error);
   });
 });
 

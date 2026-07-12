@@ -1,6 +1,6 @@
 # GMB Sarathi — Claude Code Project Instructions
 
-You are building **GMB Sarathi**, an internal GBP audit + optimization + service-delivery dashboard for a solo agency in Karad, Maharashtra. The single source of truth is `GMB_Tool_Development_Plan.md` (v1.7, Blueprint Forge format: PRD → ERD → Milestones with US/EP/TB/ADR/MS IDs). Read it fully before writing any code. The visual reference is the Claude Design prototype (screens exported by the founder) and `GMB_Sarathi_UI_Mockup.html`.
+You are building **GMB Sarathi**, an internal GBP audit + optimization + service-delivery dashboard for a solo agency in Karad, Maharashtra. The single source of truth is `GMB_Tool_Development_Plan.md` (v1.8, Blueprint Forge format: PRD → ERD → Milestones with US/EP/TB/ADR/MS IDs). Read it fully before writing any code. The visual reference is the Claude Design prototype (screens exported by the founder) and `GMB_Sarathi_UI_Mockup.html`.
 
 ## Hard constraints (never violate)
 
