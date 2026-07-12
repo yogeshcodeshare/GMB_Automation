@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GMB Sarathi — UI Mockup (v1.4, all 11 screens)</title>
+<style>
+:root{--navy:#0b2545;--blue:#1d4e89;--teal:#0d9488;--bg:#f1f5f9;--card:#fff;--ink:#1e293b;--mut:#64748b;--line:#e2e8f0;--green:#059669;--amber:#d97706;--red:#dc2626;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+aside{width:225px;background:var(--navy);color:#cbd5e1;padding:18px 0;position:fixed;top:0;bottom:0;overflow:auto}
+aside h1{font-size:17px;color:#fff;padding:0 18px 4px}
+aside .sub{font-size:10px;color:#7fb3ff;padding:0 18px 14px;letter-spacing:1px}
+aside a{display:block;padding:9px 18px;font-size:13px;color:#cbd5e1;text-decoration:none;border-left:3px solid transparent;cursor:pointer}
+aside a:hover{background:#13315c}
+aside a.on{background:#13315c;color:#fff;border-left-color:#7fb3ff}
+aside .grp{font-size:10px;letter-spacing:1.5px;color:#5c7599;padding:14px 18px 4px}
+main{margin-left:225px;flex:1;padding:24px 28px;max-width:1150px}
+.screen{display:none}.screen.on{display:block}
+.crumb{font-size:11px;color:var(--mut);margin-bottom:4px}
+h2{font-size:20px;color:var(--navy);margin-bottom:14px}
+h3{font-size:14px;color:var(--blue);margin:16px 0 8px}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:10px;padding:12px 16px;min-width:150px;flex:1;border-top:3px solid var(--blue);box-shadow:0 1px 3px rgba(2,6,23,.08)}
+.kpi b{font-size:22px;color:var(--navy);display:block}
+.kpi span{font-size:11px;color:var(--mut)}
+.card{background:var(--card);border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(2,6,23,.08);margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:#eef2f7;color:var(--navy);text-align:left;padding:8px 9px;font-size:11px;letter-spacing:.4px}
+td{padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+.btn{display:inline-block;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:12.5px;cursor:pointer;text-decoration:none}
+.btn.grn{background:var(--green)}.btn.gry{background:#eef2f7;color:var(--navy)}.btn.sm{padding:4px 9px;font-size:11px;border-radius:5px}
+.tag{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:9px;margin:1px}
+.t-g{background:#dcfce7;color:#166534}.t-a{background:#fef3c7;color:#92400e}.t-r{background:#fee2e2;color:#991b1b}.t-b{background:#dbeafe;color:#1e40af}
+input,select,textarea{border:1.5px solid var(--line);border-radius:7px;padding:8px 10px;font-size:13px;width:100%;background:#fff}
+label{font-size:11px;color:var(--mut);display:block;margin:10px 0 4px;letter-spacing:.3px}
+.row{display:flex;gap:14px;flex-wrap:wrap}.row>div{flex:1;min-width:230px}
+.gauge{width:150px;height:75px;border-radius:150px 150px 0 0;background:conic-gradient(from 270deg,var(--red) 0 25%,var(--amber) 25% 37%,#e2e8f0 37% 50%,#0000 50%);position:relative;margin:6px auto}
+.gauge::after{content:"41";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);background:var(--card);width:96px;height:48px;border-radius:96px 96px 0 0;text-align:center;font-size:26px;font-weight:700;color:var(--amber);padding-top:14px}
+.chk td:first-child{width:46%}
+.grid5{display:grid;grid-template-columns:repeat(5,44px);gap:5px;justify-content:center;margin:10px 0}
+.pin{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+.p1{background:var(--green)}.p2{background:#34d399}.p3{background:#a3e635;color:#3f6212}.p4{background:var(--amber)}.p5{background:var(--red)}.p0{background:#94a3b8}
+.rev{border-bottom:1px solid var(--line);padding:10px 0}
+.rev .who{font-size:12.5px;font-weight:600}.rev .meta{font-size:10.5px;color:var(--mut)}
+.stars{color:#f59e0b;font-size:12px}
+.chip{display:inline-block;background:#eef2f7;border-radius:12px;padding:3px 10px;font-size:11px;margin:2px;color:var(--navy)}
+.aiout{background:#f0fdfa;border-left:3px solid var(--teal);border-radius:6px;padding:10px 12px;font-size:12.5px;margin-top:8px}
+.note{background:#fffbeb;border-left:3px solid var(--amber);padding:8px 12px;font-size:11.5px;border-radius:6px;margin:8px 0;color:#78350f}
+.pub{max-width:430px;margin:0 auto;text-align:center}
+.blur{filter:blur(4px);user-select:none}
+.bar{height:9px;border-radius:6px;background:#e2e8f0;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--teal)}
+.flow{font-size:11px;color:var(--mut);background:#eef2f7;border-radius:6px;padding:6px 10px;margin-bottom:12px}
+.links a{display:inline-block;font-size:11px;color:var(--blue);background:#eff6ff;border-radius:6px;padding:3px 9px;margin:2px;text-decoration:none}
+</style>
+</head>
+<body>
+<aside>
+  <h1>GMB Sarathi</h1><div class="sub">AGENCY EDITION · MOCKUP v1.4</div>
+  <div class="grp">MAIN</div>
+  <a class="nav on" data-s="s1">📊 Dashboard <span style="float:right;font-size:10px">P1</span></a>
+  <a class="nav" data-s="s2">➕ New Audit <span style="float:right;font-size:10px">P2</span></a>
+  <div class="grp">BUSINESS · मनोवेध</div>
+  <a class="nav" data-s="s3">🧾 Audit Report <span style="float:right;font-size:10px">P3</span></a>
+  <a class="nav" data-s="s4">⚔️ Competitors <span style="float:right;font-size:10px">P4</span></a>
+  <a class="nav" data-s="s5">🗺️ Grid / Teleport <span style="float:right;font-size:10px">P5</span></a>
+  <a class="nav" data-s="s6">⭐ Review Inbox <span style="float:right;font-size:10px">P6</span></a>
+  <a class="nav" data-s="s7">📰 Post Audit <span style="float:right;font-size:10px">P7</span></a>
+  <div class="grp">TOOLS</div>
+  <a class="nav" data-s="s8">🤖 AI Tools <span style="float:right;font-size:10px">P8</span></a>
+  <a class="nav" data-s="s9">🗓️ Client Ops <span style="float:right;font-size:10px">P9</span></a>
+  <div class="grp">OTHER</div>
+  <a class="nav" data-s="s10">🌐 Public Checker <span style="float:right;font-size:10px">P10</span></a>
+  <a class="nav" data-s="s11">⚙️ Settings & Spend <span style="float:right;font-size:10px">P11</span></a>
+</aside>
+<main>
+
+<!-- P1 DASHBOARD -->
+<section class="screen on" id="s1">
+  <div class="crumb">P1 · Founder home</div><h2>Dashboard</h2>
+  <div class="flow">Workflow: see today's numbers → jump to a business → or start a New Audit before a sales visit.</div>
+  <div class="cards">
+    <div class="kpi"><b>12</b><span>Audits this week</span></div>
+    <div class="kpi"><b>4</b><span>Leads from public checker</span></div>
+    <div class="kpi"><b>₹6.20 / ₹95</b><span>DataForSEO spend today / cap<div class="bar"><i style="width:7%"></i></div></span></div>
+    <div class="kpi"><b>3 ✅ 1 ⚠️</b><span>Clients on-track this month</span></div>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Businesses</h3>
+  <table><tr><th>Business</th><th>City</th><th>Score</th><th>Last audit</th><th>Client?</th><th></th></tr>
+  <tr><td>मनोवेध हिप्नोक्लिनिक</td><td>Karad</td><td><span class="tag t-a">41 / 100</span></td><td>11 Jul 2026</td><td><span class="tag t-b">Prospect</span></td><td><button class="btn sm">Open</button></td></tr>
+  <tr><td>Hotel Jarul Inn</td><td>Karad</td><td><span class="tag t-g">78 / 100</span></td><td>08 Jul 2026</td><td><span class="tag t-g">Client</span></td><td><button class="btn sm">Open</button></td></tr>
+  <tr><td>Shree Dental Care</td><td>Karad</td><td><span class="tag t-r">32 / 100</span></td><td>05 Jul 2026</td><td><span class="tag t-b">Prospect</span></td><td><button class="btn sm">Open</button></td></tr>
+  </table></div>
+</section>
+
+<!-- P2 NEW AUDIT -->
+<section class="screen" id="s2">
+  <div class="crumb">P2 · Start here before every sales visit</div><h2>New Audit</h2>
+  <div class="flow">Workflow: type name + city → pick the right business from candidates → choose options → Run (cost preview shown) → opens Audit Report in ~2–4 min.</div>
+  <div class="card"><div class="row">
+    <div><label>BUSINESS NAME</label><input value="Manovedh Hypnoclinic"></div>
+    <div><label>CITY</label><input value="Karad"></div>
+    <div style="max-width:170px"><label>&nbsp;</label><button class="btn" style="width:100%">🔍 Search</button></div>
+  </div>
+  <h3>Select the correct business</h3>
+  <table><tr><th></th><th>Name</th><th>Address</th><th>Rating</th><th>Reviews</th></tr>
+  <tr><td><input type="radio" checked style="width:16px"></td><td>मनोवेध हिप्नोक्लिनिक (संमोहन उपचार, NLP, EFT…)</td><td>Somwar Peth, Karad 415110</td><td>4.9 ★</td><td>30</td></tr>
+  <tr><td><input type="radio" style="width:16px"></td><td>Avani Hypnotism & Wellness Center</td><td>Janvhi Arcade, Karad</td><td>4.7 ★</td><td>18</td></tr>
+  </table>
+  <div class="row" style="margin-top:10px">
+    <div><label>COMPETITORS TO COMPARE</label><select><option>Top 3 (recommended)</option><option>Top 5</option></select></div>
+    <div><label>INCLUDE WEBSITE AUDIT</label><select><option>Yes</option><option>No</option></select></div>
+    <div><label>INCLUDE POST AUDIT</label><select><option>Yes</option><option>No</option></select></div>
+  </div>
+  <p style="margin-top:12px"><button class="btn grn">▶ Run Full Audit</button> <span style="font-size:11.5px;color:var(--mut)"> Estimated cost: <b>₹1.9</b> (info ₹0.19×4 + 40 reviews ₹0.6 + posts ₹0.17 + website ₹0)</span></p>
+  <div class="note">Manual fallback: paste a Place ID / CID if search can't find the business.</div></div>
+</section>
+
+<!-- P3 AUDIT REPORT -->
+<section class="screen" id="s3">
+  <div class="crumb">P3 · The sales weapon — this becomes the Marathi PDF</div><h2>Audit Report — मनोवेध हिप्नोक्लिनिक</h2>
+  <div class="flow">Workflow: review score & checklist → read top-5 fixes → Generate PDF → Send on WhatsApp → (if meeting goes well) mark as Client.</div>
+  <div class="row">
+    <div class="card" style="max-width:260px;text-align:center"><h3 style="margin:0">Google Score</h3>
+      <div class="gauge"></div><span class="tag t-a">AMBER — needs work</span>
+      <p style="font-size:11px;color:var(--mut);margin-top:8px">Audited 11 Jul 2026 · claimed ✔ · 4.9★ (30)</p>
+      <button class="btn" style="margin-top:8px">📄 Generate PDF (मराठी)</button><br>
+      <button class="btn grn" style="margin-top:6px">📲 Send on WhatsApp</button>
+    </div>
+    <div class="card" style="flex:2"><h3 style="margin-top:0">Score checklist (rubric /100)</h3>
+      <table class="chk">
+      <tr><td>Profile claimed</td><td><span class="tag t-g">✔ 10/10</span></td><td style="font-size:11px;color:var(--mut)">Verified profile</td></tr>
+      <tr><td>Primary category</td><td><span class="tag t-r">✖ 0/15</span></td><td style="font-size:11px;color:var(--mut)">"Hospital" is generic — competitors use "Mental health clinic", "Hypnotherapy service"</td></tr>
+      <tr><td>Completeness (phone/hours/services/desc)</td><td><span class="tag t-r">✖ 7/15</span></td><td style="font-size:11px;color:var(--mut)"><b>Phone missing</b> · services list empty · hours look wrong (12–9 AM?)</td></tr>
+      <tr><td>Photos</td><td><span class="tag t-a">⚠ 4/10</span></td><td style="font-size:11px;color:var(--mut)">Few & old; 0 customer-review photos</td></tr>
+      <tr><td>Reviews — count</td><td><span class="tag t-a">⚠ 5/10</span></td><td style="font-size:11px;color:var(--mut)">30 total (top competitor: 91)</td></tr>
+      <tr><td>Reviews — velocity</td><td><span class="tag t-a">⚠ 3/8</span></td><td style="font-size:11px;color:var(--mut)">~1.2/month last 6 months</td></tr>
+      <tr><td>Reviews — owner reply rate</td><td><span class="tag t-r">✖ 1/7</span></td><td style="font-size:11px;color:var(--mut)">Only 6.67% replied (2 of 30)</td></tr>
+      <tr><td>Posts (last 30 days)</td><td><span class="tag t-r">✖ 2/10</span></td><td style="font-size:11px;color:var(--mut)">7 posts ever — one every 293 days</td></tr>
+      <tr><td>Website</td><td><span class="tag t-a">⚠ 6/10</span></td><td style="font-size:11px;color:var(--mut)">Rented subdomain (grexa.site) · meta desc missing category · no category page</td></tr>
+      <tr><td>NAP consistency</td><td><span class="tag t-a">⚠ 3/5</span></td><td style="font-size:11px;color:var(--mut)">Name & address match · phone mismatch (missing both sides)</td></tr>
+      </table></div>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Top 5 fixes (AI-drafted, editable) <span class="tag t-b">मराठी</span> <span class="tag t-b">English</span></h3>
+    <ol style="font-size:12.5px;padding-left:18px;line-height:1.7">
+      <li><b>Add a phone number today</b> — profile and website both have none; every missed searcher is a lost patient.</li>
+      <li><b>Change primary category</b> to "Mental health clinic"; add "Hypnotherapy service" as secondary.</li>
+      <li><b>Reply to all 30 reviews</b> (drafts ready in Review Inbox) and keep reply-rate at 100%.</li>
+      <li><b>Fix business hours</b> — the 12–9 AM block looks like a data-entry mistake.</li>
+      <li><b>Start weekly posts</b> — 7 posts in 5 years signals an inactive business to Google.</li>
+    </ol></div>
+  <div class="card"><h3 style="margin-top:0">Business data & link pack (auto-generated, ₹0)</h3>
+    <p style="font-size:11.5px;color:var(--mut)">Place ID ChIJI1BR…_64 · CID 1260998…4473 · KG /g/11cmqfhs_0 · 17.2934, 74.1794</p>
+    <div class="links">
+    <a>⭐ Review request link</a><a>📝 Review list</a><a>📇 Knowledge panel</a><a>📰 Posts</a><a>🛍️ Products</a><a>❓ Q&A</a><a>🏢 Other GMBs at this address</a><a>🌐 Same-domain GMBs</a><a>🍎 Apple Maps</a><a>🅱️ Bing</a><a>🧭 HERE</a><a>📘 FB Places</a><a>🔎 Google Ads run?</a><a>📣 FB Ads run?</a><a>📈 Trends</a><a>🕸️ site: index</a><a>⚡ PageSpeed</a><a>🧩 Rich results</a><a>🤖 robots.txt</a><a>🗺️ sitemap</a><a>🖼️ OG preview</a><a>🌍 WHOIS</a><a>🛠️ BuiltWith</a><a>🕰️ Wayback</a>
+    </div></div>
+</section>
+
+<!-- P4 COMPETITORS -->
+<section class="screen" id="s4">
+  <div class="crumb">P4 · Local Scan — the "show them the gap" table</div><h2>Competitor Compare — "hypno clinic", Karad</h2>
+  <div class="card"><table>
+    <tr><th></th><th>मनोवेध (target)</th><th>Avani Hypnotism</th><th>Hypnotherapy (Siddhivinayak Ngr)</th><th>Hypno Healling Clinic</th></tr>
+    <tr><td>Primary category</td><td><span class="tag t-r">Hospital</span></td><td>Hypnotherapy service</td><td>Hypnotherapy service</td><td>Mental health clinic</td></tr>
+    <tr><td>Rating</td><td>4.9 ★</td><td>4.7 ★</td><td>4.8 ★</td><td>4.6 ★</td></tr>
+    <tr><td>Reviews</td><td>30</td><td>18</td><td>44</td><td>27</td></tr>
+    <tr><td>Velocity (6 mo)</td><td>1.2/mo</td><td>0.8/mo</td><td>2.5/mo</td><td>1.1/mo</td></tr>
+    <tr><td>Owner reply rate</td><td><span class="tag t-r">7%</span></td><td>22%</td><td><span class="tag t-g">81%</span></td><td>35%</td></tr>
+    <tr><td>Photos</td><td>9</td><td>14</td><td>52</td><td>21</td></tr>
+    <tr><td>Services listed</td><td><span class="tag t-r">0</span></td><td>6</td><td>11</td><td>4</td></tr>
+    <tr><td>Distance from target</td><td>—</td><td>0.4 km</td><td>1.1 km</td><td>2.3 km</td></tr>
+  </table>
+  <div class="aiout"><b>AI summary:</b> <b>Strengths</b> — highest rating (4.9), strong Marathi word-of-mouth reviews. <b>Weaknesses</b> — generic category, zero services, 7% reply rate and near-zero posting let competitor #3 out-rank on activity signals despite lower rating. Fixing category + replies + weekly posts closes the gap in 60–90 days.</div></div>
+</section>
+
+<!-- P5 GRID -->
+<section class="screen" id="s5">
+  <div class="crumb">P5 · Local Scan (geo-grid) + Teleport</div><h2>Grid Scan — "hypno clinic" · 5×5 · 2 km</h2>
+  <div class="flow">Workflow: choose keyword/grid/radius → Run (cost preview ₹1.4) → heatmap + avg rank → save; re-run monthly for before/after proof. Teleport = 1-point scan anywhere.</div>
+  <div class="row"><div class="card" style="text-align:center">
+    <div class="grid5">
+      <div class="pin p3">6</div><div class="pin p2">3</div><div class="pin p2">2</div><div class="pin p3">5</div><div class="pin p4">9</div>
+      <div class="pin p2">3</div><div class="pin p1">1</div><div class="pin p1">1</div><div class="pin p2">2</div><div class="pin p3">7</div>
+      <div class="pin p2">2</div><div class="pin p1">1</div><div class="pin p1">★1</div><div class="pin p1">1</div><div class="pin p3">5</div>
+      <div class="pin p2">3</div><div class="pin p1">1</div><div class="pin p2">2</div><div class="pin p2">4</div><div class="pin p4">11</div>
+      <div class="pin p4">8</div><div class="pin p3">6</div><div class="pin p3">7</div><div class="pin p4">12</div><div class="pin p0">20+</div>
+    </div>
+    <span class="tag t-g">Avg rank 4.6</span> <span class="tag t-g">Top-3 in 56%</span> <span class="tag t-a">Weak: south-east (Malkapur side)</span>
+  </div>
+  <div class="card" style="max-width:300px">
+    <label>KEYWORD</label><input value="hypno clinic">
+    <label>GRID</label><select><option>5×5</option><option>3×3</option><option>7×7</option><option>Teleport (1 point)</option></select>
+    <label>RADIUS</label><select><option>2 km</option><option>1 km</option><option>5 km</option></select>
+    <p style="margin-top:12px"><button class="btn grn" style="width:100%">▶ Run scan · ₹1.4</button></p>
+    <div class="note">⚠ Rank ≠ demand: "hypno clinic" ≈ 20 searches/mo; "mental health clinic karad" ≈ 320/mo — scan the money keyword too.</div>
+    <h3>History</h3>
+    <p style="font-size:11.5px">11 Jul — avg 4.6 <span class="tag t-g">now</span><br>04 Jun — avg 6.1<br>02 May — avg 7.8 <span class="tag t-b">+3.2 in 2 months</span></p>
+  </div></div>
+</section>
+
+<!-- P6 REVIEWS -->
+<section class="screen" id="s6">
+  <div class="crumb">P6 · Review Inbox — the reply-rate machine</div><h2>Review Inbox — मनोवेध (30 reviews · 2 replied · 28 pending)</h2>
+  <div class="flow">Workflow: filter pending → AI reply (Marathi/English, tone) → edit if needed → Approve → publishes via GBP API (managed clients) or copy for manual paste (prospects). Trend & keywords feed the PDF.</div>
+  <div class="cards">
+    <div class="kpi"><b>4.90 ★</b><span>Average rating</span></div>
+    <div class="kpi"><b>6.67%</b><span>Owner reply rate <span class="tag t-r">fix this</span></span></div>
+    <div class="kpi"><b>1.2 / mo</b><span>Velocity (6 months)</span></div>
+    <div class="kpi"><b>0</b><span>Reviews with photos</span></div>
+  </div>
+  <div class="card">
+    <p><span class="chip">All 30</span><span class="chip" style="background:#dbeafe">Pending 28</span><span class="chip">5★ 28</span><span class="chip">≤3★ 1</span><span class="chip">Keyword: "anubhav" 8</span></p>
+    <div class="rev"><span class="stars">★★★★★</span> <span class="who">Sandip Jadhav</span> <span class="meta">1 review · a week ago · not replied</span>
+      <p style="font-size:12.5px">Khupach Chan Anubhav Ala. kityek varshapasun asanarya samasya sahaj nighun gelya… Thank you doctor saheb.</p>
+      <div class="aiout"><b>AI draft (मराठी · warm):</b> "धन्यवाद संदीपजी! तुमच्या विश्वासाबद्दल मनःपूर्वक आभार. तुमची समस्या दूर झाली हे ऐकून आनंद झाला. काळजी घ्या! 🙏 — मनोवेध हिप्नोक्लिनिक"
+      <p style="margin-top:6px"><button class="btn sm grn">✔ Approve & publish</button> <button class="btn sm gry">✏ Edit</button> <button class="btn sm gry">↻ Regenerate</button> <select style="width:110px;display:inline-block;font-size:11px;padding:3px"><option>मराठी</option><option>English</option></select></p></div>
+    </div>
+    <div class="rev"><span class="stars">★★★</span> <span class="who">Anirudha Patil</span> <span class="meta">Local Guide · 248 reviews · a year ago · not replied</span>
+      <p style="font-size:12.5px">Hypnotism clinic, we tried once.</p>
+      <div class="aiout"><b>AI draft (English · professional):</b> "Thank you for visiting us, Anirudha. We'd love to hear more about your experience — please call us so we can help further."
+      <p style="margin-top:6px"><button class="btn sm grn">✔ Approve</button> <button class="btn sm gry">✏ Edit</button></p></div>
+    </div>
+    <h3>Review keywords (bilingual)</h3>
+    <p><span class="chip">experience ×15</span><span class="chip">best ×14</span><span class="chip">chan ×11</span><span class="chip">khup ×9</span><span class="chip">anubhav ×8</span><span class="chip">result ×6</span><span class="chip">chan anubhav ×8</span><span class="chip">khup chan ×7</span><span class="chip">mental health ×3</span><span class="chip">fayada zala ×3</span></p>
+    <div class="note">Timeline note: Google approximates dates of reviews older than 1 year — trend chart labels this, same as GMB Everywhere.</div>
+  </div>
+</section>
+
+<!-- P7 POST AUDIT -->
+<section class="screen" id="s7">
+  <div class="crumb">P7 · Post Audit (works for ANY business incl. competitors)</div><h2>Post Audit — मनोवेध</h2>
+  <div class="cards">
+    <div class="kpi"><b>7</b><span>Total posts analyzed</span></div>
+    <div class="kpi"><b>293 days</b><span>Between posts <span class="tag t-r">inactive</span></span></div>
+    <div class="kpi"><b>171</b><span>Avg characters/post</span></div>
+    <div class="kpi"><b>26.4</b><span>Avg words/post</span></div>
+    <div class="kpi"><b>4 / 1 / 0</b><span>With images / links / videos</span></div>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Posts timeline</h3>
+    <div style="display:flex;align-items:flex-end;gap:8px;height:110px;padding:0 6px">
+      <div style="flex:1;background:var(--blue);height:14%" title="Dec 20"></div><div style="flex:1;background:var(--blue);height:28%" title="Mar 21 ×2"></div><div style="flex:1;background:#e2e8f0;height:2%"></div><div style="flex:1;background:var(--blue);height:14%" title="Dec 21"></div><div style="flex:1;background:#e2e8f0;height:2%"></div><div style="flex:1;background:var(--blue);height:14%" title="Sep 22"></div><div style="flex:1;background:var(--blue);height:14%" title="Dec 22"></div><div style="flex:1;background:#e2e8f0;height:2%"></div><div style="flex:1;background:#e2e8f0;height:2%"></div><div style="flex:1;background:var(--blue);height:14%" title="Sep 25"></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--mut);text-align:center">Dec 20 → Sep 25 · bars = posts per quarter</p>
+    <div class="aiout"><b>Sales line:</b> "7 posts in 5 years — Google sees an inactive business. Our plan: 4–8 posts every month, automatic."</div></div>
+</section>
+
+<!-- P8 AI TOOLS -->
+<section class="screen" id="s8">
+  <div class="crumb">P8 · AI Tools (OpenRouter free models · ₹0)</div><h2>AI Tools</h2>
+  <div class="card">
+    <p><span class="chip" style="background:#dbeafe">GBP Post</span><span class="chip">Review Reply</span><span class="chip">Description</span><span class="chip">Q&A draft</span><span class="chip">Facebook Post</span><span class="chip">Festival Creative</span></p>
+    <div class="row">
+      <div><label>BUSINESS CONTEXT</label><input value="मनोवेध हिप्नोक्लिनिक — hypnotherapy, NLP, EFT — Karad"><label>TOPIC / OFFER</label><input value="Free consultation week for students before exams"><label>LANGUAGE & TONE</label><div class="row"><div><select><option>मराठी</option><option>English</option><option>Hinglish</option></select></div><div><select><option>Warm</option><option>Professional</option><option>Festive</option></select></div></div>
+      <p style="margin-top:12px"><button class="btn grn">✨ Generate</button> <span style="font-size:11px;color:var(--mut)">Model: free chain (2/1000 today)</span></p></div>
+      <div><label>OUTPUT</label>
+      <div class="aiout" style="min-height:150px">"परीक्षेचं टेन्शन? 📚 मनोवेध हिप्नोक्लिनिक, कराड येथे विद्यार्थ्यांसाठी <b>मोफत सल्ला आठवडा</b>! एकाग्रता वाढवा, भीती घालवा — औषधांशिवाय. आजच अपॉइंटमेंट बुक करा. 🙏<br>#Karad #StudentSuccess #MentalHealth"</div>
+      <p style="margin-top:8px"><button class="btn sm">📋 Copy</button> <button class="btn sm gry">💾 Save</button> <button class="btn sm grn">📅 Queue to publish (client only)</button></p></div>
+    </div></div>
+</section>
+
+<!-- P9 CLIENT OPS -->
+<section class="screen" id="s9">
+  <div class="crumb">P9 · Client Ops (M9) — delivers the ₹2,999/mo GMB Boost service</div><h2>Client Ops — Hotel Jarul Inn · July 2026</h2>
+  <div class="flow">Workflow: checklist auto-ticks as actions happen → photos arrive from owner's WhatsApp → publish → monthly report auto-sends on the 1st. Bulk festival button covers ALL clients at once.</div>
+  <div class="cards">
+    <div class="kpi"><b>6 / 8</b><span>Posts published<div class="bar"><i style="width:75%"></i></div></span></div>
+    <div class="kpi"><b>7 / 10</b><span>Photos uploaded<div class="bar"><i style="width:70%"></i></div></span></div>
+    <div class="kpi"><b>100%</b><span>Reviews replied<div class="bar"><i style="width:100%"></i></div></span></div>
+    <div class="kpi"><b>Scheduled</b><span>Monthly report → 1 Aug, 9:00</span></div>
+  </div>
+  <div class="row">
+    <div class="card"><h3 style="margin-top:0">📥 Media inbox (from owner's WhatsApp)</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="width:86px;height:86px;background:#dbeafe;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--blue)">room-12.jpg</div>
+        <div style="width:86px;height:86px;background:#dbeafe;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--blue)">thali.jpg</div>
+        <div style="width:86px;height:86px;background:#dcfce7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--green)">lobby.jpg ✔</div>
+      </div>
+      <p style="margin-top:8px"><button class="btn sm grn">⬆ Publish selected to GBP</button></p>
+      <h3>⭐ Review requests</h3>
+      <p style="font-size:12px">Sent this month: <b>34</b> · reminders: 12 · new reviews detected: <b>9</b> <span class="tag t-g">26% conversion</span></p>
+      <p><button class="btn sm">Send request</button> <button class="btn sm gry">🖨 Print QR card</button></p>
+    </div>
+    <div class="card"><h3 style="margin-top:0">🪔 Bulk festival action</h3>
+      <label>FESTIVAL</label><select><option>Independence Day — 15 Aug</option><option>Ganesh Chaturthi</option><option>Diwali</option></select>
+      <label>APPLIES TO</label><select><option>All 5 connected clients</option></select>
+      <p style="font-size:11.5px;color:var(--mut);margin-top:6px">Will: set special hours + publish festival creative post per client (template engine, client logo auto-inserted).</p>
+      <p style="margin-top:8px"><button class="btn grn">Run for all clients</button></p>
+      <div class="note">NAP checklist: JustDial ✔ · IndiaMART ✔ · Sulekha ⚠ pending</div>
+    </div>
+  </div>
+</section>
+
+<!-- P10 PUBLIC -->
+<section class="screen" id="s10">
+  <div class="crumb">P10 · Public page on your website — lead magnet (rate-limited, no login)</div><h2>Public Score Checker (visitor view)</h2>
+  <div class="card pub">
+    <h3 style="font-size:18px;color:var(--navy)">तुमचा Google Score फ्री तपासा 🔍</h3>
+    <p style="font-size:12px;color:var(--mut)">तुमच्या व्यवसायाचं गुगलवर स्थान २ मिनिटांत</p>
+    <div style="margin:12px 0"><input placeholder="व्यवसायाचं नाव — उदा. मनोवेध हिप्नोक्लिनिक" value="मनोवेध हिप्नोक्लिनिक"></div>
+    <div class="gauge"></div><span class="tag t-a">41/100 — सुधारणा आवश्यक</span>
+    <div style="text-align:left;margin:14px 0;font-size:12.5px">
+      <p>❌ फोन नंबर नाही — ग्राहक कॉल करू शकत नाहीत</p>
+      <p>❌ चुकीची कॅटेगरी — स्पर्धक वर दिसतात</p>
+      <p class="blur">❌ ██████ ████ ██████ — ██████</p>
+      <p class="blur">⚠ ████ ██████ ████████</p>
+      <p class="blur">⚠ ██████████ ██ ████</p>
+    </div>
+    <input placeholder="WhatsApp नंबर टाका" style="margin-bottom:8px">
+    <label style="font-size:10.5px;text-align:left"><input type="checkbox" style="width:14px" checked> मला WhatsApp वर रिपोर्ट व टिप्स मिळण्यास संमती आहे</label>
+    <button class="btn grn" style="width:100%;margin-top:10px">📲 पूर्ण रिपोर्ट WhatsApp वर मिळवा — FREE</button>
+    <p style="font-size:10px;color:var(--mut);margin-top:8px">Powered by [तुमची एजन्सी] · rate-limited: 3 checks/day</p>
+  </div>
+</section>
+
+<!-- P11 SETTINGS -->
+<section class="screen" id="s11">
+  <div class="crumb">P11 · Founder only</div><h2>Settings & Spend</h2>
+  <div class="cards">
+    <div class="kpi"><b>₹6.20</b><span>DataForSEO today (cap ₹95) <div class="bar"><i style="width:7%"></i></div></span></div>
+    <div class="kpi"><b>₹214</b><span>This month</span></div>
+    <div class="kpi"><b>$46.10</b><span>Balance remaining (never expires)</span></div>
+    <div class="kpi"><b>2 / 1000</b><span>AI requests today (free tier)</span></div>
+  </div>
+  <div class="row">
+    <div class="card"><h3 style="margin-top:0">API connections</h3>
+      <table>
+      <tr><td>DataForSEO</td><td><span class="tag t-g">Connected</span></td><td style="font-size:11px;color:var(--mut)">the only paid service</td></tr>
+      <tr><td>OpenRouter (free models)</td><td><span class="tag t-g">Connected</span></td><td style="font-size:11px;color:var(--mut)">chain: 3 free models</td></tr>
+      <tr><td>WhatsApp Cloud API</td><td><span class="tag t-g">Connected</span></td><td style="font-size:11px;color:var(--mut)">quality: GREEN</td></tr>
+      <tr><td>PageSpeed Insights</td><td><span class="tag t-g">Free key</span></td><td style="font-size:11px;color:var(--mut)">no billing card</td></tr>
+      <tr><td>Google Business Profile</td><td><span class="tag t-b">5 clients connected</span></td><td><button class="btn sm gry">+ Connect client</button></td></tr>
+      </table></div>
+    <div class="card"><h3 style="margin-top:0">Guards</h3>
+      <label>DAILY SPEND CAP (USD)</label><input value="1.00">
+      <label>PUBLIC CHECKER — GLOBAL/DAY</label><input value="50">
+      <label>PUBLIC CHECKER — PER IP/DAY</label><input value="3">
+      <p style="margin-top:10px"><button class="btn">Save guards</button></p>
+      <div class="note">If the daily cap is hit, all external calls stop automatically — the balance can never drain.</div>
+    </div>
+  </div>
+</section>
+
+</main>
+<script>
+document.querySelectorAll('.nav').forEach(a=>a.addEventListener('click',()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
+  a.classList.add('on');document.getElementById(a.dataset.s).classList.add('on');window.scrollTo(0,0);
+}));
+</script>
+</body>
+</html>

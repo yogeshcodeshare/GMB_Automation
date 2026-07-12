@@ -1,0 +1,28 @@
+# --- secrets: NEVER commit (live keys live in .env.local) ---
+.env
+.env.*
+!.env.example
+*.pem
+
+# --- dependencies / build output ---
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.vercel/
+
+# --- test artifacts ---
+playwright-report/
+test-results/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+
+# --- local-only Claude settings ---
+.claude/settings.local.json

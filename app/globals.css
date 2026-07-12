@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design-token CSS variables (design/handoff README).
+ * Tailwind classes cover most usage; these vars exist for places
+ * Tailwind can't reach (SVG fills, inline gauges, PDF templates).
+ */
+:root {
+  --color-bg-app: #f4f2ed;
+  --color-bg-surface: #ffffff;
+  --color-bg-nav: #14201c;
+  --color-bg-public: #fbf7ef;
+  --color-ink: #1b2321;
+  --color-ink-soft: #5a6560;
+  --color-ink-faint: #8a928d;
+  --color-line: rgba(27, 35, 33, 0.1);
+  --color-brand: #0f5c48;
+  --color-brand-hover: #0b4b3a;
+  --color-accent: #e39a2d;
+  --color-accent-hover: #d68f22;
+  --band-good: #177b4b;
+  --band-good-bg: #e3f2e9;
+  --band-warn: #9a5b00;
+  --band-warn-strong: #c77d00;
+  --band-warn-bg: #faeedc;
+  --band-crit: #b3372b;
+  --band-crit-bg: #f9e5e2;
+  --band-none: #8a928d;
+}
+
+body {
+  min-height: 100vh;
+}
