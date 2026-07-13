@@ -20,6 +20,34 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-17 09:10 IST — main
+**Authed live-read walk DONE — but the two remaining flips are BLOCKED, not deferred.
+Findings + evidence in `docs/agents/DAY6_INTEGRATION.md`. Do NOT flip `/api/settings` or
+`/api/report` yet — here's why:**
+- ✅ **Walk verified (both layers).** New gated test `tests/live-read.walk.test.ts` (4 pass)
+  drives the exact route modules — `listBusinesses` / `computeDashboardStats` / `readSettings`
+  / spend-guard `getStatus` all return real seed rows off the live cloud DB. HTTP gate proven
+  live: `/api/health` 200; `/api/settings|businesses|dashboard/stats|spend/today` all 401
+  `UNAUTHORIZED` unauth. The interactive founder login → 200 is the founder's UAT step.
+- 🚑 **@Yogesh (client) — apply migration `20260716000001_dataforseo_live_enabled.sql`.** It is
+  the **only** outstanding migration (is_demo / grid top_ranks / ai 'fixes' all confirmed live).
+  The `settings` row has no `dataforseo_live_enabled` column yet → `PATCH /api/settings` of the
+  CR-1 toggle **500s** until this lands. (`readSettings` GET already fail-safes to `false`, so
+  the toggle reads fine — it just can't persist.)
+- 🐛 **@frontend — field-name bug in `components/shell/app-state.tsx:106`.** The CR-1 toggle
+  PATCHes `{ dataforseo_live: on }`, but the contract/store field is **`dataforseo_live_enabled`**
+  (`Settings` type + `validateSettingsPatch`). Even after the migration lands, this body → 400
+  "Nothing to update". Please send `{ dataforseo_live_enabled: on }`. **Until BOTH this + the
+  migration land, keep `/api/settings` OFF in `LIVE_ENDPOINTS`** (flipping it now turns today's
+  silent local no-op into a visible 400/500 at UAT).
+- 🔌 **@frontend — `/api/report` is an ORPHAN registry key.** Nothing consumes it: `genPdf`
+  (report/page.tsx:139) + `sendWa` (:151) are still deliberate mocks (setTimeout/toast; the code
+  even says "EP-006 request would carry { lang } here on Day 5"). Flipping the key is a **no-op**.
+  Leave it OFF until the report page is wired to `POST /api/report/:auditId` (+ FEATURE_PDF) and
+  WA send to `/api/wa/send` (behind the WA keys). Tracking as a Day-6/7 wiring task, not a flip.
+- ⏸️ **`app/public/dev` NOT deleted** — it's your active preview harness and the PLAN sequences
+  its removal at the **go-live cutover (Day 7, after `flush:demo`)**. Keeping it through UAT.
+
 ### @all — 2026-07-16 17:30 IST — main
 **Day 5 APPROVED by PM (4 adversarial reviews — CR-1 no-bypass, SEC-003 held, frontend
 fixes real). Working the PM fix-list; relays below.**

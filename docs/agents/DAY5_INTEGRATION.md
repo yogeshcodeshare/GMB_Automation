@@ -37,9 +37,11 @@ unverified. Steps 3, 4, 6, 7 are **gated on the DataForSEO account being verifie
 serp/info calls). Step 8 PSI is free (`PSI_API_KEY` already in `.env.local`). Step 9 needs
 the AI keys (Groq present; OpenRouter pending).
 
-**Two extra ₹0 keys (flip after the authed founder-session walk):** `/api/settings`
-(P11 GET/PATCH — the CR-1 toggle only *persists* once this is ON; PATCH short-circuits
-while OFF) and `/api/report` (M4 PDF; DataForSEO-independent). Both DB/render-only.
+**Two extra ₹0 keys — both BLOCKED, keep OFF (see `DAY6_INTEGRATION.md`).** The Day-6 authed
+walk confirmed neither is flippable yet: `/api/settings` needs client migration `20260716000001`
++ a frontend field-name fix (`dataforseo_live` → `dataforseo_live_enabled`) before the CR-1
+toggle can persist; `/api/report` is an orphan key (report-page PDF/WA are still mocks — flip is
+a no-op until wired to EP-006/EP-007).
 
 ## Delete the dev-preview route
 
