@@ -9,6 +9,7 @@ import NewAuditPage from "@/app/(dashboard)/audits/new/page";
 import ReportPage from "@/app/(dashboard)/report/page";
 import CompetitorsPage from "@/app/(dashboard)/competitors/page";
 import WebsiteAuditPage from "@/app/(dashboard)/website/page";
+import ReviewInboxPage from "@/app/(dashboard)/reviews/page";
 
 const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p1: { path: "/dashboard", render: () => <DashboardPage /> },
@@ -16,6 +17,7 @@ const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p3: { path: "/report", render: () => <ReportPage /> },
   p4: { path: "/competitors", render: () => <CompetitorsPage /> },
   p3b: { path: "/website", render: () => <WebsiteAuditPage /> },
+  p6: { path: "/reviews", render: () => <ReviewInboxPage /> },
 };
 
 /**
