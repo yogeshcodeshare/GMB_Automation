@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { SprintReportResponse } from "@/types";
 import type { PdfLang } from "@/components/shell/app-state";
 import { apiPostResult } from "@/components/lib/api";
 import {
@@ -34,25 +35,39 @@ export function SprintReportModal({
   const [lang, setLang] = useState<PdfLang>(initialLang);
   const [sent, setSent] = useState(false);
   const [waSoon, setWaSoon] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   const send = async () => {
-    const res = await apiPostResult<{ pdf_path: string; sent: boolean }>(
+    // EP-022 SprintReportRequest → SprintReportResponse (locked contract).
+    const res = await apiPostResult<SprintReportResponse>(
       `/api/sprint/${sprintId}/report`,
       { send_whatsapp: true, language: lang },
     );
-    if (!res.ok && res.code === "FEATURE_DISABLED") {
-      setWaSoon(true);
-      toast("WhatsApp sending arrives with next week's keys — PDF saved ✓");
+    if (!res.ok) {
+      if (res.code === "FEATURE_DISABLED") {
+        // PDF flag off server-side — report data still shows (partial mode).
+        setWaSoon(true);
+        toast("WhatsApp sending arrives with next week's keys — PDF saved ✓");
+        return;
+      }
+      // Registry OFF / network — demo-mode mock success.
+      setSent(true);
+      toast(`Report sent on WhatsApp ✓ · ${PDF_LANG_LABEL[lang]}`);
       return;
     }
-    if (res.ok && !res.data.sent) {
+    if (res.data.storage_url) setPdfUrl(res.data.storage_url);
+    if (res.data.wa_status === "sent") {
+      setSent(true);
+      toast(`Report sent on WhatsApp ✓ · ${PDF_LANG_LABEL[lang]}`);
+    } else {
+      // "skipped_flag_off" | "failed" | "not_requested" — PDF ok, WA didn't go.
       setWaSoon(true);
-      toast("PDF generated — WhatsApp sending arrives with next week's keys");
-      return;
+      toast(
+        res.data.wa_status === "failed"
+          ? "WhatsApp send failed — PDF saved, retry from Client Ops"
+          : "PDF generated — WhatsApp sending arrives with next week's keys",
+      );
     }
-    // Live success — or demo-mode mock success while the registry is OFF.
-    setSent(true);
-    toast(`Report sent on WhatsApp ✓ · ${PDF_LANG_LABEL[lang]}`);
   };
 
   return (
@@ -232,6 +247,16 @@ export function SprintReportModal({
                 <span className="rounded-chip bg-band-warn-bg px-3 py-[5px] text-[11.5px] font-semibold text-band-warn">
                   WhatsApp arriving soon — PDF saved
                 </span>
+              )}
+              {pdfUrl && (
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-chip border-[1.5px] border-brand bg-bg-surface px-3 py-[5px] text-[11.5px] font-bold text-brand no-underline hover:bg-[#F0F5F2]"
+                >
+                  Open PDF ↗
+                </a>
               )}
               {!sent && (
                 <button

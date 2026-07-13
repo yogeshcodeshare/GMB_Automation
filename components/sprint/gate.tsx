@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { PrereqCheck, SprintPrereqs } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
 import {
   manovedhClientGateMock,
@@ -12,40 +13,42 @@ import { useToast } from "@/components/ui/toast";
 interface GateRow {
   num: string;
   title: string;
-  ok: boolean | "warn";
-  value: string;
+  check: PrereqCheck;
+  /** Line shown when the check passes (reason is "" per contract). */
+  okValue?: string;
   action?: { label: string; run: () => void; blocked?: boolean };
   inlineFields?: boolean;
 }
 
-const CHIP = (ok: boolean | "warn") =>
+const CHIP = (ok: boolean, warn = false) =>
   cn(
     "flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full text-[11px] font-bold",
-    ok === true
-      ? "bg-band-good-bg text-band-good"
-      : ok === "warn"
+    ok
+      ? warn
         ? "bg-band-warn-bg text-band-warn"
-        : "bg-band-crit-bg text-band-crit",
+        : "bg-band-good-bg text-band-good"
+      : "bg-band-crit-bg text-band-crit",
   );
 
 /**
- * US-024 prerequisites gate — every unmet prereq renders its reason + the
- * founder action that fixes it. All four green (or warn-pass) → sprint can
- * start. Per-client fixtures come from sprintGatesMock.
+ * US-024 prerequisites gate — the five locked PrereqCheck rows, each unmet
+ * check rendered with its `reason` + the founder action that fixes it.
+ * `eligible` (AND of all five) unlocks Start; the server re-runs the gate on
+ * POST /api/sprint regardless (never trust the client gate).
  */
 export function SprintGate({
   bizId,
   onReady,
 }: {
   bizId: string;
-  /** Renders the start control once every gate passes. */
+  /** Renders the start control once every check passes. */
   onReady: (startLabel: string) => React.ReactNode;
 }) {
   const toast = useToast();
   const { capHit, liveDataEnabled } = useAppState();
   const fixture = sprintGatesMock[bizId];
 
-  // Founder-action state (per mount; per-client keys).
+  // Founder-action state (per mount; keyed remount per client).
   const [markedClient, setMarkedClient] = useState(false);
   const [clientModal, setClientModal] = useState(false);
   const [ownerName, setOwnerName] = useState("");
@@ -56,59 +59,67 @@ export function SprintGate({
 
   if (!fixture) return null;
 
+  const { prereqs, fixes, fixedValues, okValues } = fixture;
   const isManovedh = bizId === "biz-manovedh";
+
+  // Layer the founder's fix actions over the fixture's PrereqChecks.
+  const planOk = prereqs.is_client_with_plan.ok || (isManovedh && markedClient);
+  const ownerOk =
+    prereqs.owner_contact_saved.ok ||
+    (isManovedh && markedClient) ||
+    (fixes.owner === "inline_fields" && ownerSaved);
+  const connOk =
+    prereqs.connection_ready.ok ||
+    (isManovedh && markedClient) ||
+    (fixes.connection === "manual_ack" && managerAck);
+  const connWarn =
+    (fixes.connection === "manual_ack" && managerAck) ||
+    okValues.connection?.startsWith("○") === true;
+  const auditOk = prereqs.fresh_audit.ok || reaudited;
+
   const rows: GateRow[] = [
     {
       num: "①",
       title: "Client & plan",
-      ok: fixture.plan.ok || (isManovedh && markedClient),
-      value:
+      check: planOk ? { ok: true, reason: "" } : prereqs.is_client_with_plan,
+      okValue:
         isManovedh && markedClient
           ? manovedhClientGateMock.plan
-          : fixture.plan.value,
-      action:
-        !fixture.plan.ok && !markedClient
-          ? fixture.plan.fix === "mark_client"
-            ? { label: "Mark as Client…", run: () => setClientModal(true) }
-            : {
-                label: "Manage plan",
-                run: () =>
-                  toast("Open Client Ops → Manage plan to add Optimization ₹4,999"),
-              }
-          : undefined,
+          : (fixedValues.plan ?? okValues.plan),
+      action: !planOk
+        ? fixes.plan === "mark_client"
+          ? { label: "Mark as Client…", run: () => setClientModal(true) }
+          : {
+              label: "Manage plan",
+              run: () =>
+                toast("Open Client Ops → Manage plan to add Optimization ₹4,999"),
+            }
+        : undefined,
     },
     {
       num: "②",
       title: "Owner contact saved",
-      ok:
-        fixture.owner.ok ||
-        (isManovedh && markedClient) ||
-        (fixture.owner.fix === "inline_fields" && ownerSaved),
-      value:
+      check: ownerOk ? { ok: true, reason: "" } : prereqs.owner_contact_saved,
+      okValue:
         isManovedh && markedClient
           ? manovedhClientGateMock.owner
           : ownerSaved
             ? `+91 ${ownerPhone} · ${ownerName} — saved ✓`
-            : fixture.owner.value,
-      inlineFields:
-        fixture.owner.fix === "inline_fields" && !ownerSaved,
+            : okValues.owner,
+      inlineFields: fixes.owner === "inline_fields" && !ownerSaved,
     },
     {
       num: "③",
       title: "Google profile access",
-      ok:
-        fixture.connection.ok === true ||
-        fixture.connection.ok === "warn" ||
-        (isManovedh && markedClient) ||
-        (fixture.connection.fix === "manual_ack" && managerAck && "warn"),
-      value:
+      check: connOk ? { ok: true, reason: "" } : prereqs.connection_ready,
+      okValue:
         isManovedh && markedClient
           ? manovedhClientGateMock.connection
           : managerAck
-            ? "○ Manager access confirmed — manual publish mode"
-            : fixture.connection.value,
+            ? fixedValues.connection
+            : okValues.connection,
       action:
-        fixture.connection.fix === "manual_ack" && !managerAck
+        fixes.connection === "manual_ack" && !managerAck
           ? {
               label: "Confirm manager access",
               run: () => {
@@ -121,12 +132,10 @@ export function SprintGate({
     {
       num: "④",
       title: "Fresh audit ≤ 7 days",
-      ok: fixture.audit.ok || reaudited,
-      value: reaudited
-        ? (fixture.audit.fresh_value ?? "audited just now ✓")
-        : fixture.audit.value,
+      check: auditOk ? { ok: true, reason: "" } : prereqs.fresh_audit,
+      okValue: reaudited ? fixedValues.audit : okValues.audit,
       action:
-        !fixture.audit.ok && !reaudited
+        !auditOk && fixes.audit === "reaudit"
           ? {
               label: "Re-audit now · ₹1.9",
               blocked: capHit || !liveDataEnabled,
@@ -137,10 +146,16 @@ export function SprintGate({
             }
           : undefined,
     },
+    {
+      num: "⑤",
+      title: "No sprint already active",
+      check: prereqs.no_active_sprint,
+      okValue: "one active sprint per business (DB-enforced)",
+    },
   ];
 
-  const allOk = rows.every((r) => r.ok === true || r.ok === "warn");
-  const firstUnmet = rows.find((r) => !(r.ok === true || r.ok === "warn"));
+  const allOk = rows.every((r) => r.check.ok);
+  const firstUnmet = rows.find((r) => !r.check.ok);
   const startLabel = "Start sprint · lock baseline";
 
   return (
@@ -148,79 +163,88 @@ export function SprintGate({
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-[10px]">
         <div className="text-[14.5px] font-bold">Prerequisites</div>
         <span className="text-[11px] text-ink-faint">
-          all four green to start a sprint · ₹4,999 setup
+          all five green to start a sprint · ₹4,999 setup
         </span>
       </div>
-      {rows.map((r) => (
-        <div key={r.num} className="border-t border-[rgba(27,35,33,0.07)] py-[11px]">
-          <div className="flex items-start gap-[10px]">
-            <span className={CHIP(r.ok)}>
-              {r.ok === true ? "✓" : r.ok === "warn" ? "!" : "✕"}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-semibold">
-                {r.num} {r.title}
+      {rows.map((r) => {
+        const warn = r.num === "③" && r.check.ok && connWarn;
+        return (
+          <div
+            key={r.num}
+            className="border-t border-[rgba(27,35,33,0.07)] py-[11px]"
+          >
+            <div className="flex items-start gap-[10px]">
+              <span className={CHIP(r.check.ok, warn)}>
+                {r.check.ok ? (warn ? "!" : "✓") : "✕"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-semibold">
+                  {r.num} {r.title}
+                </div>
+                <div className="mt-[2px] text-[12.5px] text-ink-soft">
+                  {r.check.ok ? r.okValue : r.check.reason}
+                </div>
               </div>
-              <div className="mt-[2px] text-[12.5px] text-ink-soft">
-                {r.value}
-              </div>
+              {r.action &&
+                (r.action.blocked ? (
+                  <button
+                    disabled
+                    title={
+                      capHit
+                        ? "Daily cap reached"
+                        : "DataForSEO live data is off — enable it in Settings"
+                    }
+                    className="flex-none cursor-not-allowed whitespace-nowrap rounded-lg border border-[#C9D2DB] bg-[#EEF1F4] px-[14px] py-[7px] text-[12px] font-semibold text-[#8697A6]"
+                  >
+                    {r.action.label}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={r.action.run}
+                    className="flex-none whitespace-nowrap rounded-lg border-[1.5px] border-brand bg-bg-surface px-[14px] py-[7px] text-[12px] font-semibold text-brand hover:bg-[#F0F5F2]"
+                  >
+                    {r.action.label}
+                  </button>
+                ))}
             </div>
-            {r.action &&
-              (r.action.blocked ? (
-                <button
-                  disabled
-                  title={
-                    capHit
-                      ? "Daily cap reached"
-                      : "DataForSEO live data is off — enable it in Settings"
-                  }
-                  className="flex-none cursor-not-allowed whitespace-nowrap rounded-lg border border-[#C9D2DB] bg-[#EEF1F4] px-[14px] py-[7px] text-[12px] font-semibold text-[#8697A6]"
-                >
-                  {r.action.label}
-                </button>
-              ) : (
+            {r.inlineFields && (
+              <div className="ml-8 mt-[10px] flex flex-wrap gap-2">
+                <input
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  placeholder="Owner name"
+                  className="min-w-[140px] flex-1 rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] text-[12.5px] outline-brand"
+                />
+                <input
+                  value={ownerPhone}
+                  onChange={(e) => setOwnerPhone(e.target.value)}
+                  placeholder="Owner WhatsApp — 98XXXXXXXX"
+                  inputMode="numeric"
+                  className="min-w-[170px] flex-[1.2] rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] font-mono text-[12.5px] outline-brand"
+                />
                 <button
                   type="button"
-                  onClick={r.action.run}
-                  className="flex-none whitespace-nowrap rounded-lg border-[1.5px] border-brand bg-bg-surface px-[14px] py-[7px] text-[12px] font-semibold text-brand hover:bg-[#F0F5F2]"
+                  onClick={() => {
+                    if (
+                      ownerName.trim() &&
+                      ownerPhone.replace(/\D/g, "").length >= 10
+                    ) {
+                      setOwnerSaved(true);
+                      toast("Owner contact saved ✓");
+                    } else {
+                      toast("Enter the owner's name + a 10-digit WhatsApp number");
+                    }
+                  }}
+                  className="rounded-lg bg-brand px-[15px] py-[9px] text-[12px] font-semibold text-white hover:bg-brand-hover"
                 >
-                  {r.action.label}
+                  Save
                 </button>
-              ))}
+              </div>
+            )}
           </div>
-          {r.inlineFields && (
-            <div className="ml-8 mt-[10px] flex flex-wrap gap-2">
-              <input
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="Owner name"
-                className="min-w-[140px] flex-1 rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] text-[12.5px] outline-brand"
-              />
-              <input
-                value={ownerPhone}
-                onChange={(e) => setOwnerPhone(e.target.value)}
-                placeholder="Owner WhatsApp — 98XXXXXXXX"
-                inputMode="numeric"
-                className="min-w-[170px] flex-[1.2] rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] font-mono text-[12.5px] outline-brand"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (ownerName.trim() && ownerPhone.replace(/\D/g, "").length >= 10) {
-                    setOwnerSaved(true);
-                    toast("Owner contact saved ✓");
-                  } else {
-                    toast("Enter the owner's name + a 10-digit WhatsApp number");
-                  }
-                }}
-                className="rounded-lg bg-brand px-[15px] py-[9px] text-[12px] font-semibold text-white hover:bg-brand-hover"
-              >
-                Save
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
       <div className="border-t border-[rgba(27,35,33,0.07)] pt-3">
         {allOk ? (
           onReady(startLabel)

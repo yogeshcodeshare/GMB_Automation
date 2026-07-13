@@ -35,9 +35,15 @@ function Gauge({
 export function SprintSimulator({
   baseline,
   current,
+  allInternal,
+  vendorPoints,
 }: {
   baseline: number;
   current: number;
+  /** projectedScore() with every non-blocked task marked done. */
+  allInternal: number;
+  /** Σ rubric_points of blocked (vendor) tasks. */
+  vendorPoints: number;
 }) {
   const delta = current - baseline;
   return (
@@ -66,10 +72,11 @@ export function SprintSimulator({
       </div>
       <div className="mb-[2px] text-center text-[12px] text-ink-soft">
         If remaining internal tasks are done:{" "}
-        <span className="font-mono font-bold text-ink">~78</span>
+        <span className="font-mono font-bold text-ink">~{allInternal}</span>
       </div>
       <div className="mb-3 text-center text-[10.5px] text-ink-faint">
-        external website tasks add up to +4 when the vendor completes
+        external website tasks add up to +{vendorPoints} when the vendor
+        completes
       </div>
       {sprintRubricDeltasMock
         .filter((r) => r.state !== "same")

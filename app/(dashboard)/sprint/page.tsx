@@ -2,16 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { FixTask, SprintPatchRequest } from "@/types";
-import { sprintGroupFor } from "@/types";
+import type { SprintGroup, SprintPatchRequest, SprintTask } from "@/types";
+import { SPRINT_GROUP_LABELS, SPRINT_GROUPS, projectedScore } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
 import { apiPost } from "@/components/lib/api";
 import {
-  GBP_EDITOR_URL,
+  buildSprintGroups,
   sprintClientUpdatesMock,
   sprintDetailMock,
   sprintGatesMock,
-  sprintGroupsMeta,
   sprintTaskUiMock,
 } from "@/components/mocks/sprint";
 import { SprintGate } from "@/components/sprint/gate";
@@ -22,6 +21,16 @@ import { useToast } from "@/components/ui/toast";
 
 type Stage = "none" | "active" | "complete";
 
+/** Audit-source chips per group (UI copy, mirrors §2.7b P12). */
+const GROUP_SRC: Record<SprintGroup, string> = {
+  profile: "from Basic Audit",
+  reviews: "from Review Audit",
+  posts: "from Post Audit",
+  website: "from Website Audit",
+  visibility: "from Grid Scan",
+  citations: "NAP tracker",
+};
+
 const ACTION_GHOST =
   "rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-4 py-[9px] text-[12.5px] font-semibold hover:border-ink";
 const ACTION_SECONDARY =
@@ -29,14 +38,14 @@ const ACTION_SECONDARY =
 const APPROVE_BTN =
   "rounded-lg bg-brand px-4 py-2 text-[12.5px] font-bold text-white hover:bg-brand-hover";
 
-const STATUS_CHIP: Record<FixTask["status"], [string, string]> = {
+const STATUS_CHIP: Record<SprintTask["status"], [string, string]> = {
   done: ["✓", "bg-band-good-bg text-band-good"],
   todo: ["!", "bg-band-warn-bg text-band-warn"],
   blocked: ["✕", "bg-band-crit-bg text-band-crit"],
   doing: ["…", "bg-band-warn-bg text-band-warn"],
 };
 
-/** P12 Optimization Sprint — client selector → prereq gate → sprint board. */
+/** P12 Optimization Sprint — client selector → US-024 gate → sprint board. */
 export default function SprintPage() {
   const toast = useToast();
   const { businesses, pdfLangFor } = useAppState();
@@ -55,14 +64,16 @@ export default function SprintPage() {
   const isManovedh = clientId === "biz-manovedh";
 
   // Sprint stage (Manovedh demo board) + demo-state switcher (prototype).
+  // Contract note: on load the page reads GET /api/sprint?businessId= and
+  // branches start-vs-resume on prereqs.active_sprint_id — mock equivalent:
+  // stage 'active' == active_sprint_id set (resume), 'none' == start flow.
   const [stage, setStage] = useState<Stage>("active");
-  // Gate shows for every non-Manovedh client, and for Manovedh only before
-  // a sprint runs (stage "none") — starting from the gate activates it.
   const showGate = !isManovedh || stage === "none";
 
-  // Task state: overrides on top of the fixture (approve/skip/note/edit).
+  // Task-state overrides on top of the fixture (approve/done/note/edit).
+  const [approvedOverride, setApprovedOverride] = useState<Record<string, boolean>>({});
   const [statusOverride, setStatusOverride] = useState<
-    Record<string, FixTask["status"]>
+    Record<string, SprintTask["status"]>
   >({});
   const [noteByTask, setNoteByTask] = useState<Record<string, string>>({});
   const [valueOverride, setValueOverride] = useState<Record<string, string>>({});
@@ -72,97 +83,111 @@ export default function SprintPage() {
     profile: true,
   });
   const [openTask, setOpenTask] = useState<string | null>(null);
-  const [notifyOff, setNotifyOff] = useState<Record<string, boolean>>({});
-  const [customTasks, setCustomTasks] = useState<FixTask[]>([]);
+  const [customTasks, setCustomTasks] = useState<SprintTask[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [addTitle, setAddTitle] = useState("");
-  const [addPts, setAddPts] = useState("");
+  const [addGroup, setAddGroup] = useState<SprintGroup>("profile");
   const [batchOpen, setBatchOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [queuedUpdates, setQueuedUpdates] = useState<string[]>([]);
 
   const detail = sprintDetailMock;
-  const tasks = useMemo(
+  const tasks: SprintTask[] = useMemo(
     () =>
       [...detail.tasks, ...customTasks].map((t) => ({
         ...t,
         status: statusOverride[t.id] ?? t.status,
-        change_after: valueOverride[t.id] ?? t.change_after,
+        approved: approvedOverride[t.id] ?? t.approved,
+        suggested_value: valueOverride[t.id] ?? t.suggested_value,
         note: noteByTask[t.id] ?? t.note,
       })),
-    [detail.tasks, customTasks, statusOverride, valueOverride, noteByTask],
+    [detail.tasks, customTasks, statusOverride, approvedOverride, valueOverride, noteByTask],
   );
 
   const doneN = tasks.filter((t) => t.status === "done").length;
   const blockedN = tasks.filter((t) => t.status === "blocked").length;
   const pct = Math.round((doneN / tasks.length) * 100);
-  const approvedExtra = Object.values(statusOverride).filter(
-    (s) => s === "done",
-  ).length;
-  const currentScore = (detail.current_projected_score ?? 70) + approvedExtra * 2;
+  const baseline = detail.baseline;
+  // Locked-contract simulator math: baseline + rubric_points of done tasks.
+  const currentScore = projectedScore(baseline.score, tasks) ?? baseline.score ?? 0;
+  const allInternalScore =
+    projectedScore(
+      baseline.score,
+      tasks.map((t) => ({
+        status: t.status === "blocked" ? t.status : "done",
+        rubric_points: t.rubric_points,
+      })),
+    ) ?? currentScore;
+  const vendorPoints = tasks
+    .filter((t) => t.status === "blocked")
+    .reduce((s, t) => s + t.rubric_points, 0);
 
   /** EP-021 PATCH — typed; registry "/api/sprint" OFF → local state is truth. */
   const patchSprint = (patch: SprintPatchRequest) => {
     void apiPost(`/api/sprint/${detail.sprint.id}`, patch);
   };
 
-  const completeTask = (t: FixTask, skipped = false) => {
-    setStatusOverride((m) => ({ ...m, [t.id]: "done" }));
-    setOpenTask(null);
-    patchSprint({ task_id: t.id, task_status: "done" });
-    const ui = sprintTaskUiMock[t.id];
-    if (!skipped && ui?.waLine && !notifyOff[t.id]) {
-      setQueuedUpdates((q) => [...q, ui.waLine]);
-    }
-    toast(
-      skipped
-        ? "Marked N/A — excluded from the report"
-        : `${t.title} — applied ✓ · logged, client update queued`,
-    );
+  /** Approve tap (#4) — unlocks copy + editor + the done transition. */
+  const approveTask = (t: SprintTask) => {
+    setApprovedOverride((m) => ({ ...m, [t.id]: true }));
+    patchSprint({ task_id: t.id, task_approved: true });
+    toast(`${t.title} — suggestion approved · copy + editor unlocked`);
   };
 
-  const groups = sprintGroupsMeta
-    .map((g) => ({
-      ...g,
-      tasks: tasks.filter(
-        (t) => t.source === "audit" && sprintGroupFor(t.rubric_key) === g.key,
-      ),
-    }))
-    .filter((g) => g.tasks.length > 0);
-  const customGroup = tasks.filter((t) => t.source === "manual");
+  /** Done: requires approved + non-empty change_after (source='audit'). */
+  const markDone = (t: SprintTask) => {
+    setStatusOverride((m) => ({ ...m, [t.id]: "done" }));
+    setOpenTask(null);
+    patchSprint({
+      task_id: t.id,
+      task_status: "done",
+      change_before: t.current_value ?? undefined,
+      change_after: t.suggested_value ?? t.title,
+    });
+    const ui = sprintTaskUiMock[t.id];
+    if (ui?.waLine) setQueuedUpdates((q) => [...q, ui.waLine]);
+    toast(`${t.title} — applied ✓ · change logged`);
+  };
 
-  const renderTaskDetail = (t: FixTask) => {
-    const ui = sprintTaskUiMock[t.id] ?? {
-      pts: "+1",
-      time: "~2 min",
-      meta: "founder-added",
-      waLine: `✓ ${t.title} पूर्ण.`,
-      kind: "plain",
-    };
+  /** Contract: no 'skipped' status — a skipped task is blocked with a note. */
+  const markNa = (t: SprintTask) => {
+    setStatusOverride((m) => ({ ...m, [t.id]: "blocked" }));
+    setNoteByTask((m) => ({ ...m, [t.id]: m[t.id] || "Marked N/A by founder" }));
+    setOpenTask(null);
+    patchSprint({
+      task_id: t.id,
+      task_status: "blocked",
+      task_note: noteByTask[t.id] || "Marked N/A by founder",
+    });
+    toast("Marked N/A — excluded from the report");
+  };
+
+  const groups = buildSprintGroups(tasks);
+
+  const renderTaskDetail = (t: SprintTask) => {
     const editing = editingTask === t.id;
+    const copyValue = t.copy_text ?? t.suggested_value ?? "";
 
     if (t.status === "done") {
       return (
         <div className="pb-[13px] pl-8">
-          {t.change_before && (
+          {t.change_before !== null && (
             <div className="text-[12.5px] leading-relaxed">
               <span className="text-ink-faint">{t.change_before}</span>{" "}
               <span className="font-bold text-band-good">→</span>{" "}
               <span className="font-semibold">{t.change_after}</span>
             </div>
           )}
-          {!notifyOff[t.id] && ui.waLine && (
+          {sprintTaskUiMock[t.id]?.waLine && (
             <div className="mt-2 max-w-[520px] rounded-lg bg-[#F0F5F2] px-[11px] py-2 text-[12px] leading-relaxed">
               <span className="mb-[2px] block text-[9.5px] font-bold tracking-[0.6px] text-brand">
                 CLIENT UPDATE LINE
               </span>
-              {ui.waLine}
+              {sprintTaskUiMock[t.id].waLine}
             </div>
           )}
           {t.note && (
-            <div className="mt-2 text-[11.5px] text-ink-faint">
-              Note: {t.note}
-            </div>
+            <div className="mt-2 text-[11.5px] text-ink-faint">Note: {t.note}</div>
           )}
         </div>
       );
@@ -173,18 +198,16 @@ export default function SprintPage() {
         <div className="pb-[13px] pl-8">
           <div className="mb-2 max-w-[560px] text-[12.5px] leading-relaxed">
             <span className="font-semibold text-band-crit">
-              {t.change_before}
+              {t.current_value}
             </span>{" "}
             <span className="font-bold text-band-good">→</span>{" "}
-            <span className="font-semibold">{t.change_after}</span>
+            <span className="font-semibold">{t.suggested_value}</span>
           </div>
           <div className="flex flex-wrap items-center gap-[6px]">
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard?.writeText(
-                  `${t.title}: ${t.change_before} → ${t.change_after}`,
-                );
+                void navigator.clipboard?.writeText(copyValue);
                 toast("Copied for vendor — Marathi + English note ready to WhatsApp");
               }}
               className="rounded-lg border-[1.5px] border-brand bg-bg-surface px-[14px] py-[7px] text-[12px] font-semibold text-brand hover:bg-[#F0F5F2]"
@@ -192,7 +215,7 @@ export default function SprintPage() {
               Copy for vendor
             </button>
             <span className="text-[11px] text-ink-faint">
-              external — client&apos;s website vendor
+              {t.note ? `note: ${t.note}` : "external — client's website vendor"}
             </span>
           </div>
         </div>
@@ -218,18 +241,21 @@ export default function SprintPage() {
       );
     }
 
-    // todo — AI-prefilled value (editable) + manual-mode controls.
-    const value = t.change_after ?? "";
+    // todo — approve unlocks copy (copy_text ?? suggested_value) + editor + done.
     return (
       <div className="pb-[13px] pl-8">
         <div className="max-w-[560px] rounded-[10px] border border-[rgba(15,92,72,0.18)] bg-[#F0F5F2] px-[13px] py-[11px]">
           <div className="mb-[5px] flex flex-wrap justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.6px] text-brand">
-              {editing ? "Editing AI draft" : "Suggested by AI — review before applying"}
+              {editing
+                ? "Editing AI draft"
+                : t.approved
+                  ? "Approved — copy the value, then apply it in the Google editor"
+                  : "Suggested by AI — review before applying"}
             </span>
-            {t.id === "desc" && (
+            {t.rubric_key === "description" && (
               <span className="font-mono text-[10.5px] text-ink-soft">
-                {(editing ? draft : value).length} / 750
+                {(editing ? draft : (t.suggested_value ?? "")).length} / 750
               </span>
             )}
           </div>
@@ -247,8 +273,7 @@ export default function SprintPage() {
                   onClick={() => {
                     setValueOverride((m) => ({ ...m, [t.id]: draft }));
                     setEditingTask(null);
-                    patchSprint({ task_id: t.id, change_after: draft });
-                    toast("Draft saved — approve to apply");
+                    toast("Draft saved — approve to unlock copy + editor");
                   }}
                   className={APPROVE_BTN}
                 >
@@ -265,58 +290,91 @@ export default function SprintPage() {
             </>
           ) : (
             <>
-              {t.change_before && (
-                <div className="mb-2 text-[12.5px] leading-[1.65]">
-                  <span className="text-ink-faint">{t.change_before}</span>{" "}
-                  <span className="font-bold text-band-good">→</span>{" "}
-                  <span className="font-semibold">{value}</span>
-                </div>
-              )}
+              {/* current → suggested (contract: current_value on SprintTask) */}
+              <div className="mb-2 text-[12.5px] leading-[1.65]">
+                <span className="text-ink-faint">
+                  {t.current_value ?? "—"}
+                </span>{" "}
+                <span className="font-bold text-band-good">→</span>{" "}
+                <span className="font-semibold">{t.suggested_value}</span>
+              </div>
               <div className="flex flex-wrap items-center gap-[6px]">
+                {!t.approved ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => approveTask(t)}
+                      className={APPROVE_BTN}
+                    >
+                      Approve suggestion
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTask(t.id);
+                        setDraft(t.suggested_value ?? "");
+                      }}
+                      className={ACTION_GHOST}
+                    >
+                      Edit
+                    </button>
+                    <span className="text-[11px] text-ink-faint">
+                      approval unlocks copy + editor + done (#4)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* Manual mode (ADR-010): copy value → open Google editor */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(copyValue);
+                        toast(
+                          t.editor_hint
+                            ? `Copied — ${t.editor_hint}`
+                            : "Value copied — paste it in the Google editor",
+                        );
+                      }}
+                      className={ACTION_SECONDARY}
+                    >
+                      Copy value
+                    </button>
+                    {t.editor_url ? (
+                      <a
+                        href={t.editor_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-4 py-[9px] text-[12.5px] font-semibold no-underline hover:border-ink"
+                      >
+                        Open Google editor ↗
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-ink-faint">
+                        copy-only — no direct editor target
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => markDone(t)}
+                      className={APPROVE_BTN}
+                    >
+                      Mark done
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
-                  onClick={() => completeTask(t)}
-                  className={APPROVE_BTN}
-                >
-                  Approve &amp; apply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingTask(t.id);
-                    setDraft(value);
-                  }}
-                  className={ACTION_GHOST}
-                >
-                  Edit
-                </button>
-                {/* Manual mode (ADR-010): copy value → open Google editor */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(value);
-                    toast("Value copied — paste it in the Google editor");
-                  }}
-                  className={ACTION_SECONDARY}
-                >
-                  Copy value
-                </button>
-                <a
-                  href={GBP_EDITOR_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-4 py-[9px] text-[12.5px] font-semibold no-underline hover:border-ink"
-                >
-                  Open Google editor ↗
-                </a>
-                <button
-                  type="button"
-                  onClick={() => completeTask(t, true)}
+                  onClick={() => markNa(t)}
                   className="rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-4 py-[9px] text-[12.5px] font-semibold text-ink-soft hover:border-ink"
                 >
                   Mark N/A
                 </button>
               </div>
+              {t.editor_hint && t.approved && (
+                <div className="mt-2 text-[11px] text-ink-faint">
+                  {t.editor_hint}
+                </div>
+              )}
               <input
                 value={noteByTask[t.id] ?? ""}
                 onChange={(e) =>
@@ -364,7 +422,7 @@ export default function SprintPage() {
         </span>
       </div>
 
-      {/* Prereq gate — entry for every client until their sprint runs */}
+      {/* US-024 gate — entry for every client until their sprint runs */}
       {showGate && (
         <SprintGate
           key={clientId}
@@ -444,11 +502,19 @@ export default function SprintPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-[6px]">
-                    <span className="whitespace-nowrap rounded-chip border-[1.5px] border-[rgba(27,35,33,0.2)] px-[11px] py-1 text-[11.5px] font-semibold text-ink-soft">
-                      Baseline locked 12 Jul — {detail.baseline_score}/100
-                    </span>
+                    {baseline.locked && (
+                      <span className="whitespace-nowrap rounded-chip border-[1.5px] border-[rgba(27,35,33,0.2)] px-[11px] py-1 text-[11.5px] font-semibold text-ink-soft">
+                        Baseline locked{" "}
+                        {new Date(baseline.captured_at).toLocaleDateString(
+                          "en-IN",
+                          { day: "2-digit", month: "short" },
+                        )}{" "}
+                        — {baseline.score}/100
+                      </span>
+                    )}
                     <span className="whitespace-nowrap rounded-chip bg-band-good-bg px-[11px] py-1 text-[11.5px] font-bold text-band-good">
-                      Now {currentScore}/100 ▲ +{currentScore - (detail.baseline_score ?? 41)}
+                      Now {currentScore}/100 ▲ +
+                      {currentScore - (baseline.score ?? 0)}
                     </span>
                     <span className="whitespace-nowrap rounded-chip bg-[#EDEAE3] px-[11px] py-1 text-[11.5px] font-semibold text-ink-soft">
                       {blockedN} blocked external
@@ -495,8 +561,8 @@ export default function SprintPage() {
                   </button>
                 </div>
                 <div className="mt-[9px] text-[11px] text-ink-faint">
-                  After the last task, the re-audit runs automatically (₹1.9)
-                  and the report is drafted — you just tap Send.
+                  Completing links the after-state from existing scans only —
+                  it never triggers a paid audit or grid (#7).
                 </div>
               </Card>
 
@@ -510,26 +576,35 @@ export default function SprintPage() {
                       compose
                     </span>
                   </div>
-                  {[...groups, ...(customGroup.length ? [{ key: "custom", label: "Custom", src: "founder-added", tasks: customGroup }] : [])].map((g) => {
-                    const gDone = g.tasks.filter((t) => t.status === "done").length;
-                    const open = openGroups[g.key] ?? false;
-                    const isWebsite = g.key === "website";
+                  {groups.map((g) => {
+                    const open = openGroups[g.group] ?? false;
+                    const isWebsite = g.group === "website";
                     return (
-                      <div key={g.key} className="border-t border-[rgba(27,35,33,0.09)]">
+                      <div
+                        key={g.group}
+                        className="border-t border-[rgba(27,35,33,0.09)]"
+                      >
                         <button
                           type="button"
                           onClick={() =>
-                            setOpenGroups((m) => ({ ...m, [g.key]: !open }))
+                            setOpenGroups((m) => ({ ...m, [g.group]: !open }))
                           }
                           className="flex w-full flex-wrap items-center gap-[9px] py-3 text-left"
                         >
-                          <span className="text-[13px] font-bold">{g.label}</span>
+                          <span className="text-[13px] font-bold">
+                            {g.label}
+                          </span>
                           <span className="whitespace-nowrap rounded-chip bg-bg-app px-2 py-[2px] text-[10px] font-semibold text-ink-soft">
-                            {g.src}
+                            {GROUP_SRC[g.group]}
                           </span>
                           <span className="font-mono text-[11px] text-ink-soft">
-                            {gDone}/{g.tasks.length}
+                            {g.done_count}/{g.total_count}
                           </span>
+                          {g.remaining_minutes > 0 && (
+                            <span className="whitespace-nowrap rounded-chip bg-band-warn-bg px-2 py-[2px] font-mono text-[10px] font-bold text-band-warn">
+                              ~{g.remaining_minutes} min left
+                            </span>
+                          )}
                           {isWebsite && (
                             <span className="whitespace-nowrap text-[10.5px] font-semibold text-band-warn">
                               1 internal · 4 with vendor
@@ -543,9 +618,14 @@ export default function SprintPage() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 void navigator.clipboard?.writeText(
-                                  "Website fixes for vendor: meta description, category page, spelling Minde→Mind, heading hierarchy.",
+                                  g.tasks
+                                    .filter((t) => t.status === "blocked")
+                                    .map((t) => t.copy_text ?? t.title)
+                                    .join("\n"),
                                 );
-                                toast("Vendor brief copied — WhatsApp it to the website vendor");
+                                toast(
+                                  "Vendor brief copied — WhatsApp it to the website vendor",
+                                );
                               }}
                               className="flex-none rounded-chip border-[1.5px] border-brand bg-bg-surface px-[11px] py-[5px] text-[10.5px] font-bold text-brand hover:bg-[#F0F5F2]"
                             >
@@ -559,18 +639,18 @@ export default function SprintPage() {
                         {open && (
                           <div className="pl-2">
                             {g.tasks.map((t) => {
-                              const ui = sprintTaskUiMock[t.id] ?? {
-                                pts: "+1",
-                                time: "~2 min",
-                                meta: "founder-added",
-                                waLine: "",
-                                kind: "custom",
-                              };
                               const [glyph, chipCls] = STATUS_CHIP[t.status];
                               const isOpen = openTask === t.id;
-                              const notify = !notifyOff[t.id];
+                              const meta =
+                                statusOverride[t.id] === "done"
+                                  ? "done just now"
+                                  : (sprintTaskUiMock[t.id]?.meta ??
+                                    "founder-added");
                               return (
-                                <div key={t.id} className="border-t border-[rgba(27,35,33,0.06)]">
+                                <div
+                                  key={t.id}
+                                  className="border-t border-[rgba(27,35,33,0.06)]"
+                                >
                                   <div
                                     role="button"
                                     tabIndex={0}
@@ -579,7 +659,12 @@ export default function SprintPage() {
                                     }
                                     className="flex cursor-pointer items-center gap-[10px] py-[10px]"
                                   >
-                                    <span className={cn("flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full text-[11px] font-bold", chipCls)}>
+                                    <span
+                                      className={cn(
+                                        "flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full text-[11px] font-bold",
+                                        chipCls,
+                                      )}
+                                    >
                                       {glyph}
                                     </span>
                                     <div className="min-w-0 flex-1">
@@ -587,35 +672,29 @@ export default function SprintPage() {
                                         {t.title}
                                       </div>
                                       <div className="mt-[2px] flex flex-wrap items-center gap-2">
-                                        <span className={cn("text-[11px] font-semibold", t.status === "done" ? "text-band-good" : t.status === "blocked" ? "text-band-crit" : "text-band-warn")}>
-                                          {statusOverride[t.id] === "done"
-                                            ? "done just now"
-                                            : ui.meta}
+                                        <span
+                                          className={cn(
+                                            "text-[11px] font-semibold",
+                                            t.status === "done"
+                                              ? "text-band-good"
+                                              : t.status === "blocked"
+                                                ? "text-band-crit"
+                                                : "text-band-warn",
+                                          )}
+                                        >
+                                          {meta}
                                         </span>
-                                        <span className="font-mono text-[10.5px] text-ink-faint">
-                                          {ui.time}
-                                        </span>
+                                        {t.estimate_minutes !== null && (
+                                          <span className="font-mono text-[10.5px] text-ink-faint">
+                                            ~{t.estimate_minutes} min
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
-                                    <span
-                                      role="button"
-                                      tabIndex={0}
-                                      title="Queue a WhatsApp progress line to the client"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setNotifyOff((m) => ({ ...m, [t.id]: notify }));
-                                      }}
-                                      className={cn(
-                                        "flex-none whitespace-nowrap rounded-chip px-2 py-[3px] text-[10px] font-bold",
-                                        notify
-                                          ? "bg-band-good-bg text-band-good"
-                                          : "bg-[#EDEAE3] text-ink-faint",
-                                      )}
-                                    >
-                                      {notify ? "Notify ✓" : "Notify off"}
-                                    </span>
                                     <span className="flex-none font-mono text-[12px] font-bold text-band-good">
-                                      {ui.pts}
+                                      {t.rubric_points > 0
+                                        ? `+${t.rubric_points}`
+                                        : "·"}
                                     </span>
                                     <span className="flex-none text-[11px] text-ink-faint">
                                       {isOpen ? "▴" : "▾"}
@@ -631,7 +710,7 @@ export default function SprintPage() {
                     );
                   })}
 
-                  {/* Custom task adder */}
+                  {/* Custom task adder — {title, group} per the locked contract */}
                   {addOpen ? (
                     <div className="mt-[10px] flex flex-wrap items-center gap-2 rounded-[10px] border-[1.5px] border-brand p-3">
                       <input
@@ -640,13 +719,19 @@ export default function SprintPage() {
                         placeholder="Task title — e.g. Link Facebook page"
                         className="min-w-[180px] flex-[2] rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] text-[12.5px] outline-brand"
                       />
-                      <input
-                        value={addPts}
-                        onChange={(e) => setAddPts(e.target.value)}
-                        placeholder="pts"
-                        inputMode="numeric"
-                        className="w-16 rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] font-mono text-[12.5px] outline-brand"
-                      />
+                      <select
+                        value={addGroup}
+                        onChange={(e) =>
+                          setAddGroup(e.target.value as SprintGroup)
+                        }
+                        className="rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-[11px] py-[9px] font-sans text-[12.5px]"
+                      >
+                        {SPRINT_GROUPS.map((gr) => (
+                          <option key={gr} value={gr}>
+                            {SPRINT_GROUP_LABELS[gr]}
+                          </option>
+                        ))}
+                      </select>
                       <button
                         type="button"
                         onClick={() => {
@@ -657,28 +742,39 @@ export default function SprintPage() {
                             {
                               id,
                               sprint_id: detail.sprint.id,
-                              rubric_key: "custom",
+                              rubric_key: `custom_${id}`,
                               title: addTitle.trim(),
                               status: "todo",
                               source: "manual",
-                              done_at: null,
-                              note: null,
+                              // Manual tasks need no approval (founder authored).
+                              approved: true,
+                              suggested_value: null,
+                              copy_text: null,
+                              ai_output_id: null,
                               change_before: null,
                               change_after: null,
+                              note: null,
+                              done_at: null,
                               created_at: new Date().toISOString(),
+                              group: addGroup,
+                              rubric: null,
+                              current_value: null,
+                              editor_url: null,
+                              editor_hint: null,
+                              estimate_minutes: null,
+                              rubric_points: 0,
                             },
                           ]);
                           patchSprint({
                             add_custom_task: {
                               title: addTitle.trim(),
-                              rubric_key: "custom",
+                              group: addGroup,
                             },
                           });
                           setAddTitle("");
-                          setAddPts("");
                           setAddOpen(false);
-                          setOpenGroups((m) => ({ ...m, custom: true }));
-                          toast("Custom task added — Notify defaults ON");
+                          setOpenGroups((m) => ({ ...m, [addGroup]: true }));
+                          toast("Custom task added");
                         }}
                         className="rounded-lg bg-brand px-4 py-[9px] text-[12.5px] font-semibold text-white hover:bg-brand-hover"
                       >
@@ -691,10 +787,6 @@ export default function SprintPage() {
                       >
                         ✕
                       </button>
-                      <span className="w-full text-[10.5px] text-ink-faint">
-                        Notify defaults ON — completing it queues a client
-                        update line.
-                      </span>
                     </div>
                   ) : (
                     <button
@@ -706,25 +798,26 @@ export default function SprintPage() {
                     </button>
                   )}
                   <div className="mt-[10px] border-t border-[rgba(27,35,33,0.07)] pt-[10px] text-[11px] text-ink-faint">
-                    Connected clients publish via API · Manager-access clients
-                    get &quot;copy value → open Google editor&quot; on each
-                    control.
+                    Manual mode (ADR-010): approve → copy value → open the
+                    Google editor → mark done. Zero API writes.
                   </div>
                 </Card>
 
                 {/* Simulator + client updates */}
                 <div className="flex min-w-[290px] flex-1 flex-col gap-[14px]">
                   <SprintSimulator
-                    baseline={detail.baseline_score ?? 41}
+                    baseline={baseline.score ?? 0}
                     current={currentScore}
+                    allInternal={allInternalScore}
+                    vendorPoints={vendorPoints}
                   />
                   <Card className="px-5 py-4">
                     <div className="mb-[2px] text-[14.5px] font-bold">
                       Client updates
                     </div>
                     <div className="mb-3 text-[11.5px] text-ink-faint">
-                      Auto-queued when a task with Notify ✓ completes · one
-                      tidy message per day, no spam.
+                      Progress lines collect here — one tidy WhatsApp message
+                      per day ships with the Week-2 wa keys.
                     </div>
                     {sprintClientUpdatesMock.map((u) => (
                       <div
@@ -761,8 +854,8 @@ export default function SprintPage() {
                       </div>
                     ) : (
                       <div className="rounded-[10px] border border-dashed border-[rgba(27,35,33,0.22)] px-3 py-[10px] text-[12px] leading-relaxed text-ink-faint">
-                        No updates queued today yet — completing a task with
-                        Notify ✓ adds a line here.
+                        No updates queued today yet — completing a task adds a
+                        line here.
                       </div>
                     )}
                   </Card>
@@ -808,7 +901,7 @@ export default function SprintPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => toast("Client Ops ships later today")}
+                  onClick={() => toast("Monthly service lives in Client Ops")}
                   className="rounded-[9px] bg-brand px-[18px] py-[10px] text-[13px] font-semibold text-white hover:bg-brand-hover"
                 >
                   Monthly service continues in Client Ops →
@@ -829,16 +922,11 @@ export default function SprintPage() {
                   Apply all safe suggestions
                 </div>
                 <div className="mb-3 text-[12.5px] leading-relaxed text-ink-soft">
-                  One confirm applies every remaining low-risk AI suggestion:
+                  One confirm APPROVES every remaining low-risk AI suggestion —
+                  each still gets applied by hand (copy → Google editor):
                 </div>
                 {tasks
-                  .filter(
-                    (t) =>
-                      t.status === "todo" &&
-                      ["plain", "desc", "attr"].includes(
-                        sprintTaskUiMock[t.id]?.kind ?? "",
-                      ),
-                  )
+                  .filter((t) => t.status === "todo" && !t.approved)
                   .map((t) => (
                     <div
                       key={t.id}
@@ -852,8 +940,8 @@ export default function SprintPage() {
                           {t.title}
                         </div>
                         <div className="text-[11.5px] text-ink-soft">
-                          {sprintTaskUiMock[t.id]?.meta} ·{" "}
-                          {sprintTaskUiMock[t.id]?.pts} pts
+                          {sprintTaskUiMock[t.id]?.meta}
+                          {t.rubric_points > 0 && ` · +${t.rubric_points} pts`}
                         </div>
                       </div>
                     </div>
@@ -874,28 +962,16 @@ export default function SprintPage() {
                     type="button"
                     onClick={() => {
                       const safe = tasks.filter(
-                        (t) =>
-                          t.status === "todo" &&
-                          ["plain", "desc", "attr"].includes(
-                            sprintTaskUiMock[t.id]?.kind ?? "",
-                          ),
+                        (t) => t.status === "todo" && !t.approved,
                       );
-                      safe.forEach((t) => completeTask(t));
+                      safe.forEach((t) => approveTask(t));
                       setBatchOpen(false);
-                      toast(`Applied ${safe.length} safe suggestions ✓`);
+                      toast(`Approved ${safe.length} suggestions — apply each via copy + editor`);
                     }}
                     className="rounded-lg bg-brand px-[18px] py-[9px] text-[13px] font-semibold text-white hover:bg-brand-hover"
                   >
-                    Apply{" "}
-                    {
-                      tasks.filter(
-                        (t) =>
-                          t.status === "todo" &&
-                          ["plain", "desc", "attr"].includes(
-                            sprintTaskUiMock[t.id]?.kind ?? "",
-                          ),
-                      ).length
-                    }{" "}
+                    Approve{" "}
+                    {tasks.filter((t) => t.status === "todo" && !t.approved).length}{" "}
                     suggestions
                   </button>
                 </div>
