@@ -115,11 +115,23 @@ export class DataForSeoClient {
     return `Basic ${Buffer.from(`${creds.login}:${creds.password}`).toString("base64")}`;
   }
 
-  /** POST (or GET when body omitted) with ×2 retry on network/5xx. */
-  private async request<R>(path: string, body?: unknown): Promise<DfsEnvelope<R>> {
+  /**
+   * POST (or GET when body omitted) with ×2 retry on network/5xx.
+   * `retry: false` (task_post!) sends EXACTLY ONE request: a 5xx after a
+   * server-side success would otherwise create a duplicate, double-charged
+   * task (Day-2 review follow-up). Live endpoints keep the retry — same
+   * theoretical risk, but their failure rate dominates and the ledger's
+   * conservative settle keeps cap math honest either way.
+   */
+  private async request<R>(
+    path: string,
+    body?: unknown,
+    opts: { retry?: boolean } = {}
+  ): Promise<DfsEnvelope<R>> {
     const auth = this.authHeader();
+    const maxAttempts = opts.retry === false ? 1 : MAX_ATTEMPTS;
     let lastError: unknown = null;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const res = await this.fetchImpl(`${BASE_URL}/${path}`, {
           method: body === undefined ? "GET" : "POST",
@@ -134,7 +146,7 @@ export class DataForSeoClient {
             `DataForSEO HTTP ${res.status} on ${path}`,
             res.status
           );
-          continue; // retryable
+          continue; // retryable (loop ends immediately when maxAttempts = 1)
         }
         if (!res.ok) {
           throw new DfsUpstreamError(
@@ -155,7 +167,7 @@ export class DataForSeoClient {
         // DfsUpstreamError here is a vendor-level/4xx error — not retryable.
         if (err instanceof DfsUpstreamError) throw err;
         lastError = err; // network/parse failure — retry
-        if (attempt < MAX_ATTEMPTS) await this.sleep(250 * attempt);
+        if (attempt < maxAttempts) await this.sleep(250 * attempt);
       }
     }
     throw lastError instanceof Error
@@ -205,7 +217,8 @@ export class DataForSeoClient {
   ): Promise<R[]> {
     this.authHeader();
     const posted = await this.deps.guard.guarded(postPath, estimateUsd, async () => {
-      const envelope = await this.request<R>(postPath, body);
+      // NO transport retry on task_post — a duplicate would double-charge.
+      const envelope = await this.request<R>(postPath, body, { retry: false });
       const task = this.firstTask(envelope, postPath);
       return {
         result: task.id,
