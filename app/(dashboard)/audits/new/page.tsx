@@ -77,6 +77,21 @@ export default function NewAuditPage() {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
+  // "Re-audit · ₹1.9" from P3 lands here with ?rerun=1 → prefill + auto-run.
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).get("rerun") === "1" &&
+      !running
+    ) {
+      setName(candidatesMock[0].name);
+      setCandidates(candidatesMock);
+      setSearch("results");
+      setSel(0);
+      runAudit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const estCost = (
     0.9 +
     (comp === "Top 3" ? 0.6 : 1.0) +

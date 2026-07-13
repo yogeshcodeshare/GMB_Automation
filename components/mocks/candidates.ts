@@ -8,8 +8,8 @@ import type { BusinessCandidate } from "@/types";
  */
 export const candidatesMock: BusinessCandidate[] = [
   {
-    place_id: "ChIJVVVVVVVVVRQRmanovedh0001",
-    cid: "11297348762834455001",
+    place_id: "ChIJXQL5mR3BwjsRkH4v7VZ9aQY",
+    cid: "1129384756602311845",
     name: "मनोवेध हिप्नोक्लिनिक (संमोहन उपचार, NLP, EFT थेरपी)",
     address: "Somwar Peth, Karad",
     rating: 4.9,
