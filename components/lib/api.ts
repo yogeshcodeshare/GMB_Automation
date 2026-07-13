@@ -25,6 +25,8 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   "/api/settings": false,
   "/api/report": false,
   "/api/wa/send": false,
+  // EP-021/022 — backend lands them Day 6; P12 is wired, flip when merged:
+  "/api/sprint": false,
 };
 
 function liveKey(path: string): string {
