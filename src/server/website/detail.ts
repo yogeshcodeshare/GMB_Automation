@@ -5,6 +5,7 @@ import type { WebsiteFindings } from "@/server/audit/input";
 export function buildWebsiteAuditDetail(opts: {
   findings: WebsiteFindings;
   psi_score: number | null;
+  psi_desktop?: number | null;
   schema_ok: boolean | null;
   h1_ok: boolean | null;
   row_id: number;
@@ -16,6 +17,7 @@ export function buildWebsiteAuditDetail(opts: {
     id: opts.row_id,
     business_id: opts.business_id,
     psi_score: opts.psi_score,
+    psi_desktop: opts.psi_desktop ?? null,
     title_ok: w.title.has_category && w.title.has_city,
     meta_ok: w.meta.has_category && w.meta.has_locality,
     h1_ok: opts.h1_ok,
