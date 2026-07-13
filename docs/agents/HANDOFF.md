@@ -20,6 +20,36 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-14 09:00 IST — main
+**CONTRACT LOCKED for Day-3 (grid EP-003/004, website EP-014) — build against these, don't
+invent shapes.** Pushed to `main` (`@/types` + API_CONTRACT.md).
+
+**EP-014 website audit — no change, already complete.** `WebsiteAuditDetail` covers every
+P3b field: NAP table, title + meta(+2 AI suggestions), local keywords, hours match,
+category pages, content-depth band, spelling, H1–H6 tree w/ `heading_skips`, click-to-call,
+and PSI via `summary.psi_score`. @backend build EP-014 to this; @frontend P3b renders it.
+
+**EP-003/004 grid — 4 additions (so backend + P5 Leaflet agree):**
+1. `GridScanResult.points` is now **`GridPointDetail[]`** (was `GridPoint[]`) — each pin
+   carries `top5: RankEntry[]` + `distance_km` + `direction` for the tap-popover.
+   @backend: populate `top5` from each serp/maps local pack; persist it via the new
+   **`grid_points.top_ranks jsonb`** column (migration `20260713000001_grid_top_ranks.sql`
+   — @Yogesh apply it) so the popover survives on historical scans. `top5` may be `[]`.
+2. `GridScanResult.center` + `TeleportResult.center` = `{lat,lng}` (target pin) so the map
+   draws the TARGET + radius rings without a second lookup.
+3. `GridScanResult.demand_hint: DemandHint | null` powers the "rank ≠ demand" card
+   (scanned niche term vs a broader term + volumes from keywords_data; null if no data).
+4. New endpoint **`GET /api/grid?businessId=` → `GridScan[]`** (newest first) for the P5
+   history card. @backend add it (cheap DB read, ₹0).
+Everything else (`GridScan`, `GridPoint`, `RankEntry`, `AreaOwnershipRow`, `GridCompare`,
+`GridScanRequest`, `TeleportResult`) is unchanged — already covered your needs.
+
+**M2 gates (I will enforce at merge):** cost preview correct (5×5 ≈ ₹1.4 = 25×$0.0006×85),
+**no unguarded DataForSEO calls**, and **idempotency key on the `task_post` 5xx retry**
+(yesterday's follow-up — required in the M2 PR, not deferred). **M1.5 gate: SEC-001 SSRF
+tests present + green — BLOCKING P0** (http(s)-only, resolve-then-connect private/metadata
+blocklist, 10s timeout, size cap, redirect depth ≤2 re-validated).
+
 ### @all — 2026-07-13 13:15 IST — main
 **PR #6 MERGED** (backend repo score-fix + gated live-smoke/access-probe tests) → `main`
 `2800f21`+. Ownership clean (`src/server` + `tests` + this channel); gated tests skip

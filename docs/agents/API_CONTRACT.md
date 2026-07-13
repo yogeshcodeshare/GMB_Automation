@@ -38,7 +38,8 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-002 | `GET /api/audit/:id` | — | `AuditReport` | M1 |
 | — | `GET /api/audit/:id/progress` | — | `AuditProgress` (poll for P2 staged UI) | M1 |
 | EP-003 | `POST /api/grid` | `GridScanRequest` | `CostPreview` \| `GridScan` (queued) | M2 |
-| EP-004 | `GET /api/grid/:id` | — | `GridScanResult` \| `TeleportResult` | M2 |
+| EP-004 | `GET /api/grid/:id` | — | `GridScanResult` \| `TeleportResult` (grid_size 1) | M2 |
+| — | `GET /api/grid?businessId=` | — | `GridScan[]` (history card, newest first) | M2 |
 | — | `GET /api/grid/compare?before=&after=` | — | `GridCompare` | M2 |
 | EP-005 | `POST /api/ai/generate` | `AiGenerateRequest` | `AiGenerateResponse` | M3 |
 | EP-006 | `POST /api/report/:auditId` | `{ lang: "mr" \| "en" }` | `{ pdf_path: string; storage_url: string }` | M4 |
