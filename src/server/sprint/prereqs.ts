@@ -1,11 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Business, SprintPrereqs } from "@/types";
+import type { Business, PrereqCheck, SprintPrereqs } from "@/types";
 
 /**
  * US-024 — the EP-021 prerequisites gate, enforced SERVER-SIDE (the UI's
- * locked state is cosmetics; this is the real gate). All four must pass:
- * client with a plan · owner contact saved · connection ready (OAuth or
- * Manager access = the manual-mode ack, ADR-010) · fresh audit ≤ 7 days.
+ * locked state is cosmetics; POST re-runs this and never trusts the client).
+ * LOCKED shape: five discrete PrereqCheck{ok,reason} + eligible = AND of all.
  */
 
 const MS_PER_DAY = 86_400_000;
@@ -49,12 +48,37 @@ export async function latestScoredAudit(
   return null;
 }
 
+/** Newest finished grid scan (locked as baseline_grid_id at create). */
+export async function latestDoneGrid(
+  db: SupabaseClient,
+  businessId: string,
+  opts: { sinceIso?: string } = {}
+): Promise<string | null> {
+  const { data, error } = await db
+    .from("grid_scans")
+    .select("id, status, created_at")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) throw new Error(`grid_scans read failed: ${error.message}`);
+  const found = (data ?? []).find(
+    (g) =>
+      g.status === "done" &&
+      (!opts.sinceIso ||
+        Date.parse(g.created_at as string) >= Date.parse(opts.sinceIso))
+  );
+  return found ? (found.id as string) : null;
+}
+
+function check(ok: boolean, reason: string): PrereqCheck {
+  return { ok, reason: ok ? "" : reason };
+}
+
 export interface PrereqResult {
   prereqs: SprintPrereqs;
-  /** Human reasons for every FAILED gate — VALIDATION_ERROR details. */
+  /** Human reasons for every FAILED gate (FORBIDDEN details). */
   failures: string[];
   business: Business | null;
-  latest_audit_id: string | null;
 }
 
 export async function computePrereqs(
@@ -71,64 +95,89 @@ export async function computePrereqs(
   const business = (businessRow as Business) ?? null;
 
   if (!business) {
-    return {
-      prereqs: {
-        is_client_with_plan: false,
-        owner_contact_saved: false,
-        connection_ready: false,
-        fresh_audit: false,
-        fresh_audit_age_days: null,
-      },
-      failures: ["business not found"],
-      business: null,
-      latest_audit_id: null,
+    const missing = check(false, "business not found");
+    const prereqs: SprintPrereqs = {
+      eligible: false,
+      is_client_with_plan: missing,
+      owner_contact_saved: missing,
+      connection_ready: missing,
+      fresh_audit: missing,
+      no_active_sprint: missing,
+      fresh_audit_age_days: null,
+      fresh_audit_id: null,
+      latest_grid_id: null,
+      active_sprint_id: null,
     };
+    return { prereqs, failures: ["business not found"], business: null };
   }
 
-  // Latest SCORED audit (a failed/running audit is not a baseline).
-  const scored = await latestScoredAudit(db, businessId);
+  const [scored, latestGridId, activeRows] = await Promise.all([
+    latestScoredAudit(db, businessId),
+    latestDoneGrid(db, businessId),
+    db
+      .from("optimization_sprints")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("status", "active"),
+  ]);
+  if (activeRows.error) {
+    throw new Error(`sprint lookup failed: ${activeRows.error.message}`);
+  }
+  const activeSprintId = ((activeRows.data ?? [])[0]?.id as string) ?? null;
+
   const ageDays = scored
     ? Math.floor((now.getTime() - Date.parse(scored.created_at)) / MS_PER_DAY)
     : null;
+  const freshOk = ageDays !== null && ageDays <= FRESH_AUDIT_MAX_DAYS;
 
   const prereqs: SprintPrereqs = {
-    is_client_with_plan: business.is_client && business.plan !== null,
-    owner_contact_saved: Boolean(business.owner_name && business.owner_whatsapp),
-    connection_ready:
-      business.connection_status === "oauth" ||
-      business.connection_status === "manager",
-    fresh_audit: ageDays !== null && ageDays <= FRESH_AUDIT_MAX_DAYS,
-    fresh_audit_age_days: ageDays,
-  };
-
-  const failures: string[] = [];
-  if (!prereqs.is_client_with_plan) {
-    failures.push(
+    eligible: false, // set below
+    is_client_with_plan: check(
+      business.is_client && business.plan !== null,
       business.is_client
         ? "client has no plan — set one on the business (Manage plan)"
         : "business is a prospect — mark as client with a plan first"
-    );
-  }
-  if (!prereqs.owner_contact_saved) {
-    failures.push("owner contact missing — save owner name + WhatsApp number");
-  }
-  if (!prereqs.connection_ready) {
-    failures.push(
+    ),
+    owner_contact_saved: check(
+      Boolean(business.owner_name && business.owner_whatsapp),
+      "owner contact missing — save owner name + WhatsApp number"
+    ),
+    connection_ready: check(
+      business.connection_status === "oauth" ||
+        business.connection_status === "manager",
       "no profile access — connect via OAuth or confirm Manager access (manual mode)"
-    );
-  }
-  if (!prereqs.fresh_audit) {
-    failures.push(
+    ),
+    fresh_audit: check(
+      freshOk,
       ageDays === null
         ? "no finished audit — run an audit first"
         : `latest audit is ${ageDays} days old (max ${FRESH_AUDIT_MAX_DAYS}) — re-audit before starting`
-    );
-  }
-
-  return {
-    prereqs,
-    failures,
-    business,
-    latest_audit_id: scored ? (scored.id as string) : null,
+    ),
+    no_active_sprint: check(
+      activeSprintId === null,
+      "an active sprint already exists for this business — complete it first"
+    ),
+    fresh_audit_age_days: ageDays,
+    fresh_audit_id: freshOk && scored ? scored.id : null,
+    latest_grid_id: latestGridId,
+    active_sprint_id: activeSprintId,
   };
+  prereqs.eligible =
+    prereqs.is_client_with_plan.ok &&
+    prereqs.owner_contact_saved.ok &&
+    prereqs.connection_ready.ok &&
+    prereqs.fresh_audit.ok &&
+    prereqs.no_active_sprint.ok;
+
+  const failures = [
+    prereqs.is_client_with_plan,
+    prereqs.owner_contact_saved,
+    prereqs.connection_ready,
+    prereqs.fresh_audit,
+    prereqs.no_active_sprint,
+  ]
+    .filter((c) => !c.ok)
+    .map((c) => c.reason);
+
+  return { prereqs, failures, business };
 }

@@ -2,38 +2,34 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AuditScores,
   Business,
+  FieldChange,
   FixTask,
   OptimizationSprint,
+  PdfLanguage,
+  RubricDelta,
   RubricRow,
+  SprintBeforeAfter,
 } from "@/types";
+import { bandFor, SPRINT_TASK_CATALOG, sprintGroupFor } from "@/types";
 import { esc, gaugeSvg } from "@/server/pdf/template";
-import { bandFor } from "@/types";
-import { latestScoredAudit } from "./prereqs";
+import { compareScans } from "@/server/grid/engine";
+import { latestDoneGrid, latestScoredAudit } from "./prereqs";
 
 /**
- * EP-022 — the Before/After Improvement Report (US-021 proof vehicle).
+ * EP-022 — the Before/After Improvement Report (US-023, constraint #6).
  * "Before" = the LOCKED baseline; "after" = the newest scored audit at/after
- * sprint start (mid-sprint reports fall back to the baseline with a note).
- * Zero vendor calls — everything reads TB-002/003/017/018.
+ * sprint start. PARTIAL-REPORT semantics (locked contract): no after-audit →
+ * final/deltas null/[], report degrades to field_changes + work_log (always
+ * populated from the manual change logs — the core deliverable).
+ * Zero vendor calls — TB-002/003/004/017/018 reads only.
  */
 
-export interface SprintComparison {
+const SEED_BY_KEY = new Map(SPRINT_TASK_CATALOG.map((s) => [s.rubric_key, s]));
+
+export interface SprintReportData {
   business: Business;
   sprint: OptimizationSprint;
-  before: { audit_id: string; total: number; rubric: RubricRow[] };
-  after: { audit_id: string; total: number; rubric: RubricRow[] } | null;
-  score_delta: number | null;
-  rubric_deltas: Array<{
-    key: string;
-    label: string;
-    before: number;
-    after: number | null;
-    max: number;
-    delta: number | null;
-  }>;
-  field_changes: Array<{ title: string; before: string | null; after: string | null }>;
-  work_log: Array<{ title: string; status: string; done_at: string | null }>;
-  note: string | null;
+  report: SprintBeforeAfter;
 }
 
 async function auditWithRubric(
@@ -53,7 +49,7 @@ async function auditWithRubric(
 export async function buildSprintComparison(
   db: SupabaseClient,
   sprintId: string
-): Promise<SprintComparison | null> {
+): Promise<SprintReportData | null> {
   const { data: sprintRow, error } = await db
     .from("optimization_sprints")
     .select()
@@ -85,6 +81,19 @@ export async function buildSprintComparison(
   }
   const after = afterId ? await auditWithRubric(db, afterId) : null;
 
+  // Grid compare: baseline grid vs after grid, when BOTH exist (DB-only read).
+  let grid: SprintBeforeAfter["grid"] = null;
+  const afterGridId =
+    sprint.after_grid_id ??
+    (await latestDoneGrid(db, sprint.business_id, { sinceIso: sprint.started_at }));
+  if (sprint.baseline_grid_id && afterGridId && afterGridId !== sprint.baseline_grid_id) {
+    try {
+      grid = await compareScans(db, sprint.baseline_grid_id, afterGridId);
+    } catch {
+      grid = null; // grid compare is garnish — never fails the report
+    }
+  }
+
   const { data: taskRows } = await db
     .from("fix_tasks")
     .select()
@@ -93,55 +102,110 @@ export async function buildSprintComparison(
   const tasks = (taskRows ?? []) as FixTask[];
 
   const afterByKey = new Map((after?.rubric ?? []).map((r) => [r.key, r]));
-  const rubric_deltas = before.rubric.map((r) => {
-    const a = afterByKey.get(r.key);
-    return {
-      key: r.key,
-      label: r.label,
-      before: r.points,
-      after: a ? a.points : null,
-      max: r.max,
-      delta: a ? a.points - r.points : null,
-    };
-  });
+  const rubric_deltas: RubricDelta[] = after
+    ? before.rubric.map((r) => {
+        const a = afterByKey.get(r.key);
+        return {
+          key: r.key,
+          label: r.label,
+          before: r.points,
+          after: a?.points ?? r.points,
+          delta: (a?.points ?? r.points) - r.points,
+          max: r.max,
+        };
+      })
+    : [];
 
-  return {
-    business: businessRow as Business,
-    sprint,
-    before: { audit_id: sprint.baseline_audit_id, total: before.total, rubric: before.rubric },
-    after: after && afterId ? { audit_id: afterId, ...after } : null,
+  const field_changes: FieldChange[] = tasks
+    .filter((t) => t.status === "done" && (t.change_before || t.change_after))
+    .map((t) => ({
+      rubric_key: t.rubric_key,
+      title: t.title,
+      group: sprintGroupFor(t.rubric_key),
+      rubric: SEED_BY_KEY.get(t.rubric_key)?.rubric ?? null,
+      before: t.change_before,
+      after: t.change_after,
+    }));
+
+  const report: SprintBeforeAfter = {
+    baseline_score: before.total,
+    final_score: after?.total ?? null,
     score_delta: after ? after.total - before.total : null,
+    band_before: bandFor(before.total),
+    band_after: after ? bandFor(after.total) : null,
     rubric_deltas,
-    field_changes: tasks
-      .filter((t) => t.status === "done" && (t.change_before || t.change_after))
-      .map((t) => ({ title: t.title, before: t.change_before, after: t.change_after })),
-    work_log: tasks.map((t) => ({ title: t.title, status: t.status, done_at: t.done_at })),
-    note: after
-      ? null
-      : "No re-audit since sprint start — showing baseline only. Re-audit to unlock the delta.",
+    field_changes,
+    grid,
+    work_log: tasks.map((t) => ({
+      title: t.title,
+      status: t.status,
+      done_at: t.done_at,
+    })),
+    tasks_done: tasks.filter((t) => t.status === "done").length,
+    tasks_total: tasks.length,
   };
+
+  return { business: businessRow as Business, sprint, report };
 }
 
-/** Compact before/after HTML (SEC-003 rules apply: esc everything dynamic;
- * same CSP + bundled-font posture as the audit template). */
-export function renderSprintReportHtml(c: SprintComparison): string {
-  const beforeBand = bandFor(c.before.total);
-  const afterBand = c.after ? bandFor(c.after.total) : null;
+/** Report copy per language (deterministic strings; US-023 Marathi default). */
+const L: Record<
+  PdfLanguage,
+  { title: string; before: string; after: string; deltas: string; changes: string; log: string; partial: string }
+> = {
+  mr: {
+    title: "सुधारणा अहवाल",
+    before: "आधी",
+    after: "नंतर",
+    deltas: "गुण बदल",
+    changes: "बदललेली माहिती",
+    log: "कामाची नोंद",
+    partial:
+      "स्प्रिंट सुरू झाल्यापासून पुन्हा-ऑडिट झालेले नाही — सध्या फक्त बेसलाइन दिसते. फरक पाहण्यासाठी पुन्हा-ऑडिट करा.",
+  },
+  en: {
+    title: "Improvement Report",
+    before: "Before",
+    after: "After",
+    deltas: "Rubric deltas",
+    changes: "Field changes",
+    log: "Work log",
+    partial:
+      "No re-audit since sprint start — showing baseline only. Re-audit to unlock the delta.",
+  },
+  hinglish: {
+    title: "Sudharna Report",
+    before: "Aadhi",
+    after: "Nantar",
+    deltas: "Gun Badal",
+    changes: "Badleli Mahiti",
+    log: "Kamachi Nond",
+    partial:
+      "Sprint suru zalyapasun re-audit zale nahi — sadhya fakt baseline. Farak pahnyasathi re-audit kara.",
+  },
+};
 
-  const deltaRows = c.rubric_deltas
+/** Compact before/after HTML (SEC-003: esc everything dynamic; same CSP +
+ * bundled-font posture as the audit template — Devanagari included). */
+export function renderSprintReportHtml(
+  data: SprintReportData,
+  lang: PdfLanguage = "mr"
+): string {
+  const { business, sprint, report: r } = data;
+  const t = L[lang];
+
+  const deltaRows = r.rubric_deltas
     .map(
       (d) => `<tr>
         <td>${esc(d.label)}</td>
         <td class="num">${esc(d.before)}/${esc(d.max)}</td>
-        <td class="num">${d.after === null ? "—" : `${esc(d.after)}/${esc(d.max)}`}</td>
-        <td class="num ${d.delta !== null && d.delta > 0 ? "up" : ""}">${
-          d.delta === null ? "—" : d.delta > 0 ? `+${esc(d.delta)}` : esc(d.delta)
-        }</td>
+        <td class="num">${esc(d.after)}/${esc(d.max)}</td>
+        <td class="num ${d.delta > 0 ? "up" : ""}">${d.delta > 0 ? `+${esc(d.delta)}` : esc(d.delta)}</td>
       </tr>`
     )
     .join("");
 
-  const changes = c.field_changes
+  const changes = r.field_changes
     .map(
       (f) => `<tr><td>${esc(f.title)}</td><td>${esc(f.before ?? "—")}</td><td>${esc(
         f.after ?? "—"
@@ -149,7 +213,7 @@ export function renderSprintReportHtml(c: SprintComparison): string {
     )
     .join("");
 
-  const log = c.work_log
+  const log = r.work_log
     .map(
       (w) =>
         `<li class="${esc(w.status)}">${esc(w.title)} — ${esc(w.status)}${
@@ -159,16 +223,16 @@ export function renderSprintReportHtml(c: SprintComparison): string {
     .join("");
 
   return `<!doctype html>
-<html lang="mr">
+<html lang="${lang === "hinglish" ? "mr-Latn" : lang}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:;">
-<title>${esc(c.business.name)} — Before/After</title>
+<title>${esc(business.name)} — ${t.title}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10px;
-         color: #111827; padding: 16px 22px; }
+  body { font-family: "Noto Sans Devanagari", "Segoe UI", Arial, sans-serif;
+         font-size: 10px; color: #111827; padding: 16px 22px; }
   h1 { font-size: 16px; margin-bottom: 2px; }
   .meta { color: #6b7280; margin-bottom: 8px; }
   .gauges { display: flex; gap: 30px; justify-content: center; margin: 10px 0; }
@@ -183,34 +247,34 @@ export function renderSprintReportHtml(c: SprintComparison): string {
   li.done { color: #16a34a; }
   li.blocked { color: #dc2626; }
   .note { background: #fef3c7; padding: 6px 8px; border-radius: 4px; margin: 6px 0; }
+  .summary { color: #6b7280; margin: 4px 0; }
 </style>
 </head>
 <body>
-  <h1>${esc(c.business.name)}</h1>
-  <div class="meta">Optimization Sprint · ${esc(c.sprint.started_at.slice(0, 10))}${
-    c.sprint.completed_at ? ` → ${esc(c.sprint.completed_at.slice(0, 10))}` : " (active)"
-  }</div>
+  <h1>${esc(business.name)} — ${t.title}</h1>
+  <div class="meta">${esc(sprint.started_at.slice(0, 10))}${
+    sprint.completed_at ? ` → ${esc(sprint.completed_at.slice(0, 10))}` : " (active)"
+  } · ${esc(r.tasks_done)}/${esc(r.tasks_total)} ✓</div>
 
-  ${c.note ? `<div class="note">${esc(c.note)}</div>` : ""}
+  ${r.final_score === null ? `<div class="note">${t.partial}</div>` : ""}
 
   <div class="gauges">
-    <div class="col">${gaugeSvg(c.before.total, beforeBand)}<div>Before</div></div>
+    <div class="col">${gaugeSvg(r.baseline_score ?? 0, r.band_before ?? "amber")}<div>${t.before}</div></div>
     ${
-      c.after
-        ? `<div class="delta">${c.score_delta !== null && c.score_delta >= 0 ? "▲" : "▼"} ${esc(
-            Math.abs(c.score_delta ?? 0)
+      r.final_score !== null
+        ? `<div class="delta">${(r.score_delta ?? 0) >= 0 ? "▲" : "▼"} ${esc(
+            Math.abs(r.score_delta ?? 0)
           )}</div>
-           <div class="col">${gaugeSvg(c.after.total, afterBand ?? "amber")}<div>After</div></div>`
+           <div class="col">${gaugeSvg(r.final_score, r.band_after ?? "amber")}<div>${t.after}</div></div>`
         : ""
     }
   </div>
 
-  <h2>Rubric deltas</h2>
-  <table>${deltaRows}</table>
+  ${deltaRows ? `<h2>${t.deltas}</h2><table>${deltaRows}</table>` : ""}
 
-  ${changes ? `<h2>Field changes (done tasks)</h2><table>${changes}</table>` : ""}
+  ${changes ? `<h2>${t.changes}</h2><table>${changes}</table>` : ""}
 
-  <h2>Work log</h2>
+  <h2>${t.log}</h2>
   <ul>${log}</ul>
 </body>
 </html>`;

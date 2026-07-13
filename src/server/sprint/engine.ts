@@ -6,26 +6,50 @@ import type {
   OptimizationSprint,
   RubricKey,
   RubricRow,
+  SprintBaseline,
   SprintDetail,
+  SprintGroup,
   SprintPatchRequest,
+  SprintTask,
+  SprintTaskGroup,
+} from "@/types";
+import {
+  bandFor,
+  projectedScore,
+  SPRINT_GROUP_LABELS,
+  SPRINT_GROUPS,
+  SPRINT_TASK_CATALOG,
+  sprintGroupFor,
 } from "@/types";
 import type { AuditInput } from "@/server/audit/input";
 import { generate, type AiServiceDeps } from "@/server/ai/service";
-import { computePrereqs, latestScoredAudit } from "./prereqs";
-import { generateCatalog, type CatalogTask } from "./catalog";
+import { computePrereqs } from "./prereqs";
+import { generateCatalog, isAllowlistedEditorUrl, type CatalogTask } from "./catalog";
 
 /**
- * EP-021 — the Optimization Sprint engine (M6, MANUAL MODE — zero GBP API
- * writes, zero DataForSEO calls; everything here is DB + optional AI drafts).
- * The baseline locks at creation (TB-017) and is IMMUTABLE thereafter — no
- * code path in this module ever updates baseline_audit_id / baseline_grid_id.
+ * EP-021 — the Optimization Sprint engine (M6, MANUAL MODE). LOCKED-contract
+ * guarantees enforced here (types: src/types/sprint.ts; DB: migration
+ * 20260717000001 trigger + one-active index):
+ *  #1 zero GBP API writes — "apply" = copy → founder pastes in the editor
+ *  #3 baseline immutable after create (no code path writes baseline_*)
+ *  #4 approve-before-publish — source='audit' done needs approved=true +
+ *     non-empty change_after
+ *  #7 zero paid calls — POST/PATCH/report only read existing rows
  */
 
 export class SprintGateError extends Error {
-  readonly code = "VALIDATION_ERROR" as const;
+  readonly code = "FORBIDDEN" as const;
   constructor(readonly reasons: string[]) {
     super(`Sprint prerequisites not met: ${reasons.join(" · ")}`);
     this.name = "SprintGateError";
+  }
+}
+
+export class SprintPatchError extends Error {
+  readonly code = "VALIDATION_ERROR" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "SprintPatchError";
   }
 }
 
@@ -36,15 +60,7 @@ export interface SprintDeps {
   now?: () => Date;
 }
 
-/** Additive response payload (HANDOFF-noted): per-task manual-mode data. */
-export type ManualLinks = Record<
-  string,
-  { copy_value: string | null; google_editor_url: string }
->;
-
-export type SprintDetailWithManual = SprintDetail & { manual_links: ManualLinks };
-
-// ---------- reads ----------
+// ---------- low-level reads ----------
 
 async function loadSprint(
   db: SupabaseClient,
@@ -96,113 +112,137 @@ async function loadSnapshot(
   return (data?.raw_snapshot as { input?: AuditInput; rubric?: RubricRow[] }) ?? null;
 }
 
-// ---------- projected-score simulator ----------
+// ---------- enrichment (all fields COMPUTED, none persisted) ----------
 
-/** task rubric_key → the §2.5 rubric row it improves (null = no direct row). */
-const TASK_ROW: Record<string, RubricKey | null> = {
-  primary_category: "category",
-  phone: "completeness",
-  hours: "completeness",
-  services: "completeness",
-  description: "completeness",
-  photos: "photos",
-  logo_cover: "photos",
-  opening_date: "completeness",
-  social_links: "completeness",
-  utm_website: "website",
-  reply_backlog: "reply_rate",
-  review_machine: "reviews_count",
-  review_velocity: "reviews_velocity",
-  posts_cadence: "posts",
-  website_title: "website",
-  website_meta: "website",
-  website_category_page: "website",
-  website_headings: "website",
-  website_spelling: "website",
-  weak_zone: null,
-  citation_justdial: "nap",
-  citation_indiamart: "nap",
-  citation_sulekha: "nap",
-};
+const SEED_BY_KEY = new Map(SPRINT_TASK_CATALOG.map((s) => [s.rubric_key, s]));
 
-/** Deterministic simulator: each rubric row's LOST baseline points are split
- * evenly across the row's open tasks; done tasks contribute their share. */
-export function projectedScore(
-  baselineRubric: RubricRow[],
-  baselineTotal: number,
-  tasks: FixTask[]
-): number {
-  const lostByRow = new Map<RubricKey, number>();
-  for (const row of baselineRubric) lostByRow.set(row.key, row.max - row.points);
-
-  const tasksByRow = new Map<RubricKey, FixTask[]>();
+/** Integer rubric_points per task: each rubric row's baseline gap split across
+ * the sprint's tasks on that row (floor + remainder to the earliest tasks);
+ * per-row sum === gap ≤ RUBRIC_MAX − baseline (contract invariant). */
+export function rubricPointsFor(
+  tasks: FixTask[],
+  baselineRubric: RubricRow[]
+): Map<string, number> {
+  const gapByRow = new Map<RubricKey, number>(
+    baselineRubric.map((r) => [r.key, Math.max(0, r.max - r.points)])
+  );
+  const rowTasks = new Map<RubricKey, FixTask[]>();
   for (const task of tasks) {
-    const row = TASK_ROW[task.rubric_key] ?? null;
-    if (!row) continue;
-    const list = tasksByRow.get(row) ?? [];
+    const rubric = SEED_BY_KEY.get(task.rubric_key)?.rubric ?? null;
+    if (!rubric) continue;
+    const list = rowTasks.get(rubric) ?? [];
     list.push(task);
-    tasksByRow.set(row, list);
+    rowTasks.set(rubric, list);
   }
-
-  let gain = 0;
-  tasksByRow.forEach((rowTasks, rowKey) => {
-    const lost = lostByRow.get(rowKey) ?? 0;
-    if (lost <= 0) return;
-    const share = lost / rowTasks.length;
-    gain += rowTasks.filter((t) => t.status === "done").length * share;
+  const points = new Map<string, number>();
+  rowTasks.forEach((list, rubric) => {
+    const gap = gapByRow.get(rubric) ?? 0;
+    const base = Math.floor(gap / list.length);
+    let remainder = gap - base * list.length;
+    for (const task of list) {
+      points.set(task.id, base + (remainder > 0 ? 1 : 0));
+      if (remainder > 0) remainder--;
+    }
   });
-
-  return Math.min(100, Math.round(baselineTotal + gain));
+  return points;
 }
 
-// ---------- detail assembly ----------
+function enrichTasks(
+  tasks: FixTask[],
+  baselineRubric: RubricRow[],
+  catalog: CatalogTask[] | null
+): SprintTask[] {
+  const catalogByKey = new Map((catalog ?? []).map((c) => [c.seed.rubric_key, c]));
+  const points = rubricPointsFor(tasks, baselineRubric);
+  return tasks.map((task): SprintTask => {
+    const seed = SEED_BY_KEY.get(task.rubric_key) ?? null;
+    const cat = catalogByKey.get(task.rubric_key) ?? null;
+    const editorUrl = cat?.editor_url ?? null;
+    return {
+      ...task,
+      group: sprintGroupFor(task.rubric_key),
+      rubric: seed?.rubric ?? null,
+      current_value: cat?.current_value ?? null,
+      editor_url: isAllowlistedEditorUrl(editorUrl) ? editorUrl : null,
+      editor_hint: cat?.editor_hint ?? null,
+      estimate_minutes: seed?.estimate_minutes ?? null,
+      rubric_points: points.get(task.id) ?? 0,
+    };
+  });
+}
+
+function groupTasks(tasks: SprintTask[]): SprintTaskGroup[] {
+  return SPRINT_GROUPS.map((group): SprintTaskGroup => {
+    const groupTasks = tasks.filter((t) => t.group === group);
+    return {
+      group,
+      label: SPRINT_GROUP_LABELS[group],
+      tasks: groupTasks,
+      done_count: groupTasks.filter((t) => t.status === "done").length,
+      total_count: groupTasks.length,
+      remaining_minutes: groupTasks
+        .filter((t) => t.status !== "done")
+        .reduce((sum, t) => sum + (t.estimate_minutes ?? 0), 0),
+    };
+  }).filter((g) => g.total_count > 0);
+}
+
+// ---------- detail assembly (EP-021 read) ----------
 
 export async function getSprintDetail(
   deps: SprintDeps,
   sprintId: string
-): Promise<SprintDetailWithManual | null> {
+): Promise<SprintDetail | null> {
   const { db } = deps;
   const sprint = await loadSprint(db, sprintId);
   if (!sprint) return null;
-  const tasks = await loadTasks(db, sprintId);
-  const baselineScores = await loadScores(db, sprint.baseline_audit_id);
-  const snapshot = sprint.baseline_audit_id
-    ? await loadSnapshot(db, sprint.baseline_audit_id)
-    : null;
 
-  const projected =
-    baselineScores && snapshot?.rubric
-      ? projectedScore(snapshot.rubric, baselineScores.total, tasks)
-      : null;
+  const [tasks, baselineScores, snapshot, gate] = await Promise.all([
+    loadTasks(db, sprintId),
+    loadScores(db, sprint.baseline_audit_id),
+    loadSnapshot(db, sprint.baseline_audit_id),
+    computePrereqs(db, sprint.business_id, deps.now ? deps.now() : new Date()),
+  ]);
 
-  // Manual-mode payloads derive deterministically from the LOCKED baseline —
-  // stable across reads, no extra storage (additive field, HANDOFF-noted).
-  let manual_links: ManualLinks = {};
-  if (snapshot?.input) {
-    const { data: businessRow } = await db
-      .from("businesses")
-      .select()
-      .eq("id", sprint.business_id)
-      .maybeSingle();
-    if (businessRow) {
-      const catalog = generateCatalog(businessRow as Business, snapshot.input);
-      const byKey = new Map(catalog.map((c) => [c.rubric_key, c.manual]));
-      manual_links = Object.fromEntries(
-        tasks
-          .map((t) => [t.id, byKey.get(t.rubric_key)] as const)
-          .filter((pair): pair is [string, CatalogTask["manual"]] => Boolean(pair[1]))
-          .map(([id, manual]) => [id, manual])
-      );
-    }
+  let catalog: CatalogTask[] | null = null;
+  if (snapshot?.input && gate.business) {
+    catalog = generateCatalog(gate.business, snapshot.input);
   }
+  const enriched = enrichTasks(tasks, snapshot?.rubric ?? [], catalog);
+
+  const baseline: SprintBaseline = {
+    audit_id: sprint.baseline_audit_id,
+    grid_id: sprint.baseline_grid_id,
+    score: baselineScores?.total ?? null,
+    band: baselineScores ? bandFor(baselineScores.total) : null,
+    captured_at: sprint.started_at,
+    locked: Boolean(sprint.baseline_audit_id),
+  };
 
   return {
     sprint,
-    tasks,
-    baseline_score: baselineScores?.total ?? null,
-    current_projected_score: projected,
-    manual_links,
+    baseline,
+    groups: groupTasks(enriched),
+    tasks: enriched,
+    baseline_score: baseline.score,
+    current_projected_score: projectedScore(baseline.score, enriched),
+    prereqs: gate.prereqs,
   };
+}
+
+/** GET /api/sprint?businessId= — the ACTIVE sprint or null (page-mount read). */
+export async function getActiveSprintDetail(
+  deps: SprintDeps,
+  businessId: string
+): Promise<SprintDetail | null> {
+  const { data, error } = await deps.db
+    .from("optimization_sprints")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("status", "active");
+  if (error) throw new Error(`sprint lookup failed: ${error.message}`);
+  const id = (data ?? [])[0]?.id as string | undefined;
+  return id ? getSprintDetail(deps, id) : null;
 }
 
 // ---------- create (EP-021 POST) ----------
@@ -210,43 +250,22 @@ export async function getSprintDetail(
 export async function createSprint(
   deps: SprintDeps,
   businessId: string
-): Promise<SprintDetailWithManual> {
+): Promise<SprintDetail> {
   const { db } = deps;
   const now = deps.now ? deps.now() : new Date();
 
+  // Server-side US-024 gate — includes the ⑤ no_active_sprint check.
   const gate = await computePrereqs(db, businessId, now);
-  if (gate.failures.length > 0) throw new SprintGateError(gate.failures);
+  if (!gate.prereqs.eligible) throw new SprintGateError(gate.failures);
 
-  // One ACTIVE sprint per business.
-  const { data: activeRows, error: activeErr } = await db
-    .from("optimization_sprints")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("status", "active");
-  if (activeErr) throw new Error(`sprint lookup failed: ${activeErr.message}`);
-  if ((activeRows ?? []).length > 0) {
-    throw new SprintGateError([
-      "an active sprint already exists for this business — complete it first",
-    ]);
-  }
-
-  // Baseline grid: newest finished scan, if any (optional).
-  const { data: gridRows } = await db
-    .from("grid_scans")
-    .select("id, status, created_at")
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: false })
-    .limit(5);
-  const baselineGrid = (gridRows ?? []).find((g) => g.status === "done");
-
-  // ---- LOCK the baseline (immutable from here on) ----
+  // ---- LOCK the baseline (immutable from here on; DB trigger backs this) ----
   const { data: sprintRow, error: insErr } = await db
     .from("optimization_sprints")
     .insert({
       business_id: businessId,
       started_at: now.toISOString(),
-      baseline_audit_id: gate.latest_audit_id,
-      baseline_grid_id: baselineGrid ? baselineGrid.id : null,
+      baseline_audit_id: gate.prereqs.fresh_audit_id,
+      baseline_grid_id: gate.prereqs.latest_grid_id,
       status: "active",
     })
     .select()
@@ -254,15 +273,17 @@ export async function createSprint(
   if (insErr) throw new Error(`sprint insert failed: ${insErr.message}`);
   const sprint = sprintRow as OptimizationSprint;
 
-  // ---- generate + persist the task catalog ----
-  const snapshot = await loadSnapshot(db, gate.latest_audit_id as string);
+  // ---- instantiate the locked 23-task catalog against the baseline ----
+  const snapshot = await loadSnapshot(db, sprint.baseline_audit_id);
   if (!snapshot?.input) {
     throw new Error("baseline audit has no normalized snapshot — re-run the audit");
   }
   const catalog = generateCatalog(gate.business as Business, snapshot.input);
 
-  // AI prefills (draft-only, approved=false in ai_outputs) — best-effort:
-  // the sprint NEVER fails because a free model was unavailable.
+  // AI prefills → suggested_value + ai_output_id (draft-only, approved=false
+  // in ai_outputs AND on the task). Best-effort: a dead free model never
+  // blocks sprint creation.
+  const aiDrafts = new Map<string, { text: string; output_id: string }>();
   for (const task of catalog) {
     if (!task.ai_prefill) continue;
     try {
@@ -291,22 +312,32 @@ export async function createSprint(
         { db, complete: deps.ai?.complete, fetchImpl: deps.ai?.fetchImpl },
         req
       );
-      task.change_after = draft.output;
+      aiDrafts.set(task.seed.rubric_key, {
+        text: draft.output,
+        output_id: draft.output_id,
+      });
     } catch {
-      // leave the deterministic prefill (or null) — founder writes their own
+      // deterministic suggestion (or none) stands — founder writes their own
     }
   }
 
-  const rows = catalog.map((t) => ({
-    sprint_id: sprint.id,
-    rubric_key: t.rubric_key,
-    title: t.title,
-    status: "todo",
-    source: "audit",
-    note: t.note,
-    change_before: t.change_before,
-    change_after: t.change_after,
-  }));
+  const rows = catalog.map((t) => {
+    const ai = aiDrafts.get(t.seed.rubric_key);
+    return {
+      sprint_id: sprint.id,
+      rubric_key: t.seed.rubric_key,
+      title: t.seed.title,
+      status: "todo",
+      source: "audit",
+      approved: false, // approve-before-publish (#4)
+      suggested_value: ai?.text ?? t.suggested_value,
+      copy_text: t.copy_text,
+      ai_output_id: ai?.output_id ?? null,
+      note: t.note,
+      change_before: t.current_value,
+      change_after: null,
+    };
+  });
   const { error: tasksErr } = await db.from("fix_tasks").insert(rows);
   if (tasksErr) throw new Error(`fix_tasks insert failed: ${tasksErr.message}`);
 
@@ -318,20 +349,61 @@ export async function createSprint(
 // ---------- patch (EP-021 PATCH) ----------
 
 const PATCHABLE_TASK_STATUS = new Set(["todo", "doing", "done", "blocked"]);
-/** Baseline fields are IMMUTABLE — any attempt is rejected loudly. */
+/** Baseline/after fields are locked (#3/#7) — any attempt is rejected loudly. */
 const FORBIDDEN_PATCH_KEYS = [
   "baseline_audit_id",
   "baseline_grid_id",
+  "after_audit_id",
+  "after_grid_id",
   "started_at",
   "business_id",
+  "status",
+  "completed_at",
 ];
+/** The strict SprintPatchRequest shape — unknown keys → VALIDATION_ERROR. */
+export const ALLOWED_PATCH_KEYS = [
+  "task_id",
+  "task_status",
+  "task_approved",
+  "task_note",
+  "change_before",
+  "change_after",
+  "add_custom_task",
+  "complete_sprint",
+] as const;
 
-export function assertNoBaselineTamper(rawBody: Record<string, unknown>): void {
-  const hit = FORBIDDEN_PATCH_KEYS.filter((k) => k in rawBody);
-  if (hit.length > 0) {
-    throw new SprintGateError([
-      `baseline is locked — ${hit.join(", ")} cannot be changed after sprint start`,
-    ]);
+export function assertStrictPatchShape(rawBody: Record<string, unknown>): void {
+  const locked = FORBIDDEN_PATCH_KEYS.filter((k) => k in rawBody);
+  if (locked.length > 0) {
+    throw new SprintPatchError(
+      `baseline is locked — ${locked.join(", ")} cannot be changed after sprint start`
+    );
+  }
+  const unknown = Object.keys(rawBody).filter(
+    (k) => !(ALLOWED_PATCH_KEYS as readonly string[]).includes(k)
+  );
+  if (unknown.length > 0) {
+    throw new SprintPatchError(
+      `unknown key${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")} — the PATCH shape is strict`
+    );
+  }
+}
+
+/** Synthesize a rubric_key whose sprintGroupFor() lands in the picked group. */
+export function customKeyFor(group: SprintGroup, nonce: string): string {
+  switch (group) {
+    case "website":
+      return `website_custom_${nonce}`;
+    case "citations":
+      return `citation_custom_${nonce}`;
+    case "reviews":
+      return `review_custom_${nonce}`;
+    case "posts":
+      return `posts_custom_${nonce}`;
+    case "visibility":
+      return `weak_zone_custom_${nonce}`;
+    default:
+      return `custom_${nonce}`;
   }
 }
 
@@ -339,86 +411,108 @@ export async function patchSprint(
   deps: SprintDeps,
   sprintId: string,
   req: SprintPatchRequest
-): Promise<SprintDetailWithManual> {
+): Promise<SprintDetail> {
   const { db } = deps;
   const now = deps.now ? deps.now() : new Date();
 
   const sprint = await loadSprint(db, sprintId);
   if (!sprint) throw new Error("NOT_FOUND");
-  if (sprint.status === "complete" && !req.task_id && !req.add_custom_task) {
-    throw new SprintGateError(["sprint is complete — no further changes"]);
+  if (sprint.status === "complete") {
+    throw new SprintPatchError("sprint is complete — no further changes");
   }
 
   let acted = false;
 
   if (req.task_id) {
+    const { data: taskRow, error: tErr } = await db
+      .from("fix_tasks")
+      .select()
+      .eq("id", req.task_id)
+      .eq("sprint_id", sprintId) // never cross-sprint
+      .maybeSingle();
+    if (tErr) throw new Error(`task read failed: ${tErr.message}`);
+    if (!taskRow) throw new Error("NOT_FOUND");
+    const task = taskRow as FixTask;
+
     const patch: Record<string, unknown> = {};
+    if (req.task_approved !== undefined) patch.approved = req.task_approved;
+    if (req.task_note !== undefined) patch.note = req.task_note;
+    if (req.change_before !== undefined) patch.change_before = req.change_before;
+    if (req.change_after !== undefined) patch.change_after = req.change_after;
     if (req.task_status !== undefined) {
       if (!PATCHABLE_TASK_STATUS.has(req.task_status)) {
-        throw new SprintGateError([`task_status must be todo|doing|done|blocked`]);
+        throw new SprintPatchError("task_status must be todo|doing|done|blocked");
+      }
+      if (req.task_status === "done" && task.source === "audit") {
+        // #4: in manual mode, copy→paste IS the publish step.
+        const approved = req.task_approved ?? task.approved;
+        const changeAfter = req.change_after ?? task.change_after;
+        if (!approved) {
+          throw new SprintPatchError(
+            "approve the suggestion first — audit tasks need approved=true before 'done'"
+          );
+        }
+        if (!changeAfter || changeAfter.trim() === "") {
+          throw new SprintPatchError(
+            "record change_after (the value you actually applied) before marking done"
+          );
+        }
       }
       patch.status = req.task_status;
       patch.done_at = req.task_status === "done" ? now.toISOString() : null;
     }
-    if (req.task_note !== undefined) patch.note = req.task_note;
-    if (req.change_after !== undefined) patch.change_after = req.change_after;
     if (Object.keys(patch).length === 0) {
-      throw new SprintGateError(["task_id given but nothing to change"]);
+      throw new SprintPatchError("task_id given but nothing to change");
     }
-    const { data: updated, error } = await db
+    const { error } = await db
       .from("fix_tasks")
       .update(patch)
       .eq("id", req.task_id)
-      .eq("sprint_id", sprintId) // never cross-sprint
-      .select()
-      .maybeSingle();
+      .eq("sprint_id", sprintId);
     if (error) throw new Error(`task update failed: ${error.message}`);
-    if (!updated) throw new Error("NOT_FOUND");
     acted = true;
   }
 
   if (req.add_custom_task) {
-    const { title, rubric_key } = req.add_custom_task;
-    if (!title?.trim() || title.length > 120 || !rubric_key?.trim() || rubric_key.length > 40) {
-      throw new SprintGateError(["custom task needs a title (≤120) and rubric_key (≤40)"]);
+    const { title, group } = req.add_custom_task;
+    if (!title?.trim() || title.length > 120) {
+      throw new SprintPatchError("custom task needs a title (≤120 chars)");
     }
+    if (!SPRINT_GROUPS.includes(group)) {
+      throw new SprintPatchError(
+        `group must be one of: ${SPRINT_GROUPS.join(", ")}`
+      );
+    }
+    const nonce = now.getTime().toString(36);
     const { error } = await db.from("fix_tasks").insert({
       sprint_id: sprintId,
-      rubric_key: rubric_key.trim(),
+      rubric_key: customKeyFor(group, nonce),
       title: title.trim(),
       status: "todo",
-      source: "manual",
+      source: "manual", // client can never mint source='audit'
+      approved: true, // founder authored it — no approval step (#4)
+      suggested_value: null,
+      copy_text: null,
+      ai_output_id: null,
     });
     if (error) throw new Error(`custom task insert failed: ${error.message}`);
     acted = true;
   }
 
   if (req.complete_sprint) {
-    if (sprint.status === "complete") {
-      throw new SprintGateError(["sprint is already complete"]);
-    }
-    // Lock the after-state: newest SCORED audit at/after sprint start.
-    const after = await latestScoredAudit(db, sprint.business_id, {
-      sinceIso: sprint.started_at,
-    });
-    const { data: gridRows } = await db
-      .from("grid_scans")
-      .select("id, status, created_at")
-      .eq("business_id", sprint.business_id)
-      .order("created_at", { ascending: false })
-      .limit(5);
-    const afterGrid = (gridRows ?? []).find(
-      (g) =>
-        g.status === "done" &&
-        Date.parse(g.created_at as string) >= Date.parse(sprint.started_at)
-    );
+    // Link after_* from ALREADY-EXISTING rows only (#7) — never EP-001/grid.
+    const { latestScoredAudit, latestDoneGrid } = await import("./prereqs");
+    const [after, afterGrid] = await Promise.all([
+      latestScoredAudit(db, sprint.business_id, { sinceIso: sprint.started_at }),
+      latestDoneGrid(db, sprint.business_id, { sinceIso: sprint.started_at }),
+    ]);
     const { error } = await db
       .from("optimization_sprints")
       .update({
         status: "complete",
         completed_at: now.toISOString(),
         after_audit_id: after ? after.id : null,
-        after_grid_id: afterGrid ? afterGrid.id : null,
+        after_grid_id: afterGrid,
       })
       .eq("id", sprintId);
     if (error) throw new Error(`sprint complete failed: ${error.message}`);
@@ -426,9 +520,9 @@ export async function patchSprint(
   }
 
   if (!acted) {
-    throw new SprintGateError([
-      "empty patch — provide task_id changes, add_custom_task, or complete_sprint",
-    ]);
+    throw new SprintPatchError(
+      "empty patch — provide task_id changes, add_custom_task, or complete_sprint"
+    );
   }
 
   const detail = await getSprintDetail(deps, sprintId);

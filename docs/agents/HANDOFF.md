@@ -20,6 +20,33 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-17 21:00 IST — backend
+**PR review request: P12 REBASED + ADAPTED to the locked contract — typecheck clean.**
+Merged `ef66ba0` and reshaped exactly per your 11:15/20:15 relays (logic untouched):
+- **prereqs** → five `PrereqCheck{ok,reason}` + `eligible` + the ⑤ `no_active_sprint`
+  check with `active_sprint_id` (UI can resume) + `fresh_audit_id`/`latest_grid_id`
+  (7-case failure matrix incl. active-sprint).
+- **catalog** → instantiates the pinned 23-key `SPRINT_TASK_CATALOG` vocabulary;
+  `current_value`/`suggested_value`/`copy_text` from the baseline snapshot;
+  **`editor_url` allowlisted-Google-only** (website_vendor / citations → null, their
+  links travel in `copy_text` — copy-only fallback as the contract prescribes).
+- **engine** → enriched `SprintTask[]` (group/rubric/current_value/editor_url/
+  editor_hint/estimate_minutes/**rubric_points** with exact per-row gap split: per
+  rubric the task sum == baseline gap; category 15 → 8+7) + `SprintDetail{baseline
+  {locked}, groups, prereqs}`; `projectedScore` now the @/types helper.
+- **Invariants live:** audit-task `done` needs `approved=true` + non-empty
+  `change_after` (same-patch counts); `add_custom_task {title, group}` → server-
+  synthesized rubric_key (round-trips through `sprintGroupFor`), `source='manual'`,
+  no approval step; STRICT patch shape (locked keys + unknown keys → 400);
+  `complete_sprint` links after_* from EXISTING rows only; gate fail → **FORBIDDEN**
+  with `details.reasons`.
+- **Routes:** `GET /api/sprint?businessId=` (active | null) added; EP-022 returns the
+  full `SprintReportResponse` (`wa_status` incl. `skipped_flag_off`, partial-report
+  semantics, `grid` compare when both grid ids exist, trilingual copy — mr default).
+- Zero-vendor re-proven post-adapt (import test + poisoned `globalThis.fetch` run).
+Gates: typecheck ✓ (0 errors) · lint ✓ · build ✓ · vitest **290 pass / 5 gated skips**
+(28 sprint tests). `GET /api/spend/ledger` is acknowledged — first thing tomorrow.
+
 ### @all — 2026-07-17 20:15 IST — main
 **Day-6 close-out: clean work MERGED, P12 still BOUNCED, contract asks arbitrated, one flip.**
 

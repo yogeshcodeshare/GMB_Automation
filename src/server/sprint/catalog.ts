@@ -1,333 +1,341 @@
-import type { Business } from "@/types";
+import type { Business, SprintTaskSeed } from "@/types";
+import { SPRINT_TASK_CATALOG } from "@/types";
 import type { AuditInput } from "@/server/audit/input";
 import { relatedCategoryIntel } from "@/server/audit/categories";
 import { categorySuggestion, isGenericCategory } from "@/server/audit/sanity";
 
 /**
- * P12 — the grouped fix-task catalog (§2.7b, ~23 tasks for a Manovedh-grade
- * audit), generated from the audit snapshot. MANUAL MODE: every task carries
- * a copy_value (what the founder pastes) + a google_editor_url deep link
- * (where to paste it) — zero GBP API writes in M6.
- * Groups derive from rubric_key via sprintGroupFor (@/types).
+ * P12 — instantiate the LOCKED 23-task catalog (SPRINT_TASK_CATALOG pins the
+ * rubric_key vocabulary) against the baseline audit snapshot. MANUAL MODE:
+ * per task we derive current_value (what the profile shows today),
+ * suggested_value / copy_text (what the founder pastes), editor_url
+ * (allowlisted GOOGLE editor surface only — directories go in the note) and
+ * editor_hint. Zero GBP API writes, zero vendor calls.
  */
 
 export interface CatalogTask {
-  rubric_key: string;
-  title: string;
-  change_before: string | null;
-  /** AI-prefill slot — engine may overwrite with an ai.service draft. */
-  change_after: string | null;
+  seed: SprintTaskSeed;
+  current_value: string | null;
+  suggested_value: string | null;
+  copy_text: string | null;
   note: string | null;
-  manual: {
-    copy_value: string | null;
-    google_editor_url: string;
-  };
-  /** Engine hint: which tasks want an AI draft (persisted approved=false). */
+  editor_url: string | null;
+  editor_hint: string | null;
+  /** Engine hint: which tasks want an ai.service draft (approved=false). */
   ai_prefill?: "description" | "post";
 }
 
-/** Owner-facing edit surface per area — manual mode deep links. The
- * knowledge-panel link shows the owner's Edit chips when logged in as a
- * manager; falls back to the Maps CID link, then the GBP dashboard. */
-export function editorUrlFor(
-  area: "profile" | "posts" | "reviews" | "website" | "maps" | string,
-  business: Business,
-  input: AuditInput
-): string {
+/** Allowlisted Google editor hosts (#1 / ADR-010) — never fetched server-side. */
+const GOOGLE_EDITOR_HOSTS = [
+  "www.google.com",
+  "search.google.com",
+  "business.google.com",
+];
+
+export function isAllowlistedEditorUrl(url: string | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && GOOGLE_EDITOR_HOSTS.includes(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Owner-facing GOOGLE edit surface: knowledge-panel edit (kgmid) → Maps CID
+ * → GBP dashboard. */
+function googleEditorUrl(business: Business, input: AuditInput): string {
   const kgId = input.profile.kg_id;
   const cid = business.cid ?? input.profile.cid;
-  if (area === "website" && business.website) return business.website;
-  if (area === "posts") {
-    return kgId
-      ? `https://www.google.com/search?kgmid=${encodeURIComponent(kgId)}&uact=5#lpstate=pid:-1`
-      : "https://business.google.com/posts";
-  }
-  if (area === "reviews" && input.profile.place_id) {
-    return `https://search.google.com/local/reviews?placeid=${encodeURIComponent(input.profile.place_id)}`;
-  }
   if (kgId) return `https://www.google.com/search?kgmid=${encodeURIComponent(kgId)}`;
   if (cid) return `https://www.google.com/maps/place/?cid=${encodeURIComponent(cid)}`;
   return "https://business.google.com/";
 }
 
-const DIRECTORY_URLS: Record<string, (name: string, city: string) => string> = {
-  citation_justdial: (name, city) =>
-    `https://www.justdial.com/${encodeURIComponent(city)}/search?q=${encodeURIComponent(name)}`,
-  citation_indiamart: (name) =>
-    `https://dir.indiamart.com/search.mp?ss=${encodeURIComponent(name)}`,
-  citation_sulekha: (name, city) =>
-    `https://www.sulekha.com/search?keyword=${encodeURIComponent(name)}&location=${encodeURIComponent(city)}`,
-};
+function postsEditorUrl(business: Business, input: AuditInput): string {
+  const kgId = input.profile.kg_id;
+  return kgId
+    ? `https://www.google.com/search?kgmid=${encodeURIComponent(kgId)}&uact=5#lpstate=pid:-1`
+    : "https://business.google.com/posts";
+}
 
-/** Generate the audit-driven catalog. Deficit-driven tasks appear only when
- * the audit shows the deficit; standard-practice tasks always appear. */
+function reviewsEditorUrl(business: Business, input: AuditInput): string {
+  return input.profile.place_id
+    ? `https://search.google.com/local/reviews?placeid=${encodeURIComponent(input.profile.place_id)}`
+    : googleEditorUrl(business, input);
+}
+
+const DIRECTORY_SEARCHES = (name: string, city: string) =>
+  [
+    `JustDial: https://www.justdial.com/${encodeURIComponent(city)}/search?q=${encodeURIComponent(name)}`,
+    `IndiaMART: https://dir.indiamart.com/search.mp?ss=${encodeURIComponent(name)}`,
+    `Sulekha: https://www.sulekha.com/search?keyword=${encodeURIComponent(name)}&location=${encodeURIComponent(city)}`,
+  ].join("\n");
+
+/** Per-key enrichment against the audit snapshot. */
 export function generateCatalog(business: Business, input: AuditInput): CatalogTask[] {
-  const tasks: CatalogTask[] = [];
   const p = input.profile;
-  const name = business.name;
   const city = business.city ?? p.city ?? "Karad";
-  const profileUrl = editorUrlFor("profile", business, input);
-  const push = (t: Omit<CatalogTask, "manual"> & { manual?: Partial<CatalogTask["manual"]> }) =>
-    tasks.push({
-      ...t,
-      manual: {
-        copy_value: t.manual?.copy_value ?? null,
-        google_editor_url: t.manual?.google_editor_url ?? profileUrl,
-      },
-    });
+  const name = business.name;
+  const site = business.website ?? p.website;
+  const editor = googleEditorUrl(business, input);
+  const hoursText = p.hours.map((h) => `${h.day}: ${h.text}`).join(" · ");
+  const napBlock = [name, p.address, p.phone].filter(Boolean).join("\n");
 
-  // ---------- Profile ----------
-  const primary = p.categories.primary;
-  if (!primary || isGenericCategory(primary)) {
-    const suggestion = primary ? categorySuggestion(primary) : null;
-    push({
-      rubric_key: "primary_category",
-      title: "Fix primary category",
-      change_before: primary,
-      change_after: suggestion,
-      note: suggestion ? `Suggested: ${suggestion}` : "Pick the most specific category Google offers",
-      manual: { copy_value: suggestion },
-    });
-  }
-  if (!p.phone) {
-    push({
-      rubric_key: "phone",
-      title: "Add business phone number",
-      change_before: null,
-      change_after: business.owner_whatsapp,
-      note: "Calls are the #1 GBP action — use the number customers should reach",
-      manual: { copy_value: business.owner_whatsapp },
-    });
-  }
-  if (p.hours.some((h) => h.anomaly)) {
-    push({
-      rubric_key: "hours",
-      title: "Correct opening hours",
-      change_before: p.hours.map((h) => `${h.day}: ${h.text}`).join(" · "),
-      change_after: null,
-      note: "The 12–9 AM overnight block looks like a data-entry error — confirm real hours with the owner",
-    });
-  }
-  if (p.services.length === 0) {
-    const intel = relatedCategoryIntel(primary ? [primary] : []);
-    const services = intel.related_services.slice(0, 8);
-    push({
-      rubric_key: "services",
-      title: `Add services list (${services.length || "8"} services)`,
-      change_before: "Services not found",
-      change_after: services.join(", ") || null,
-      note: "Google matches service searches against this list",
-      manual: { copy_value: services.join("\n") || null },
-    });
-  }
-  push({
-    rubric_key: "description",
-    title: "Rewrite business description",
-    change_before: p.description,
-    change_after: null, // AI prefill slot
-    note: "AI draft below — edit before pasting (approve-before-publish)",
-    ai_prefill: "description",
-  });
-  if ((p.photos_total ?? 0) < 10) {
-    push({
-      rubric_key: "photos",
-      title: "Upload 10 fresh photos",
-      change_before: `${p.photos_total ?? 0} photos on profile`,
-      change_after: null,
-      note: "Front, inside, team, results — phones are fine",
-    });
-  }
-  push({
-    rubric_key: "logo_cover",
-    title: "Set logo and cover photo",
-    change_before: null,
-    change_after: null,
-    note: null,
-  });
-  push({
-    rubric_key: "opening_date",
-    title: "Add business opening date",
-    change_before: null,
-    change_after: null,
-    note: null,
-  });
-  push({
-    rubric_key: "social_links",
-    title: "Add social profile links",
-    change_before: null,
-    change_after: null,
-    note: null,
-  });
-  if (business.website ?? p.website) {
-    const site = (business.website ?? p.website) as string;
-    const utm = `${site}${site.includes("?") ? "&" : "?"}utm_source=gbp&utm_medium=profile`;
-    push({
-      rubric_key: "utm_website",
-      title: "Set UTM-tagged website link",
-      change_before: site,
-      change_after: utm,
-      manual: { copy_value: utm },
-      note: "Makes GBP traffic visible in analytics",
-    });
-  }
-
-  // ---------- Reviews ----------
-  const reviewsUrl = editorUrlFor("reviews", business, input);
-  const replyRate = input.reviews?.stats.reply_rate_pct ?? null;
-  if (replyRate === null || replyRate < 50) {
-    push({
-      rubric_key: "reply_backlog",
-      title: "Reply to all unanswered reviews",
-      change_before: replyRate === null ? "reply rate unknown" : `${replyRate}% replied`,
-      change_after: null,
-      note: "Use the AI Reply tool per review — approve each before posting",
-      manual: { google_editor_url: reviewsUrl },
-    });
-  }
-  push({
-    rubric_key: "review_machine",
-    title: "Launch review-request machine (QR + WhatsApp)",
-    change_before: null,
-    change_after: null,
-    note: input.profile.place_id
-      ? `Review link: https://search.google.com/local/writereview?placeid=${input.profile.place_id}`
-      : null,
-    manual: {
-      copy_value: input.profile.place_id
-        ? `https://search.google.com/local/writereview?placeid=${input.profile.place_id}`
-        : null,
-      google_editor_url: reviewsUrl,
-    },
-  });
-  if ((input.reviews?.stats.velocity_per_month_6m ?? 0) < 2) {
-    push({
-      rubric_key: "review_velocity",
-      title: "Ask 10 recent customers for reviews",
-      change_before: `${input.reviews?.stats.velocity_per_month_6m ?? 0}/month over 6 months`,
-      change_after: null,
+  return SPRINT_TASK_CATALOG.map((seed): CatalogTask => {
+    const base: CatalogTask = {
+      seed,
+      current_value: null,
+      suggested_value: null,
+      copy_text: null,
       note: null,
-      manual: { google_editor_url: reviewsUrl },
-    });
-  }
+      editor_url: editor,
+      editor_hint: null,
+    };
 
-  // ---------- Posts ----------
-  if ((input.posts?.last_30d_count ?? 0) < 4) {
-    push({
-      rubric_key: "posts_cadence",
-      title: "Publish first 4 GBP posts of the month",
-      change_before: input.posts
-        ? `${input.posts.stats.total} posts ever, ${input.posts.last_30d_count} in last 30 days`
-        : "no post data",
-      change_after: null, // AI prefill slot
-      note: "AI draft for post #1 below — offers, tips, festivals",
-      manual: { google_editor_url: editorUrlFor("posts", business, input) },
-      ai_prefill: "post",
-    });
-  }
-
-  // ---------- Website (vendor sub-tasks; copy brief for vendor) ----------
-  const w = input.website;
-  const siteUrl = business.website ?? p.website;
-  if (siteUrl) {
-    const webUrl = editorUrlFor("website", business, input);
-    if (!w || !(w.title.has_category && w.title.has_city)) {
-      const suggested = `${name} - ${primary ?? "your category"} in ${city}`;
-      push({
-        rubric_key: "website_title",
-        title: "Fix title tag (category + locality)",
-        change_before: w?.title.value ?? null,
-        change_after: suggested,
-        manual: { copy_value: suggested, google_editor_url: webUrl },
-        note: "Copy brief for the website vendor",
-      });
+    switch (seed.rubric_key) {
+      case "primary_phone":
+        return {
+          ...base,
+          current_value: p.phone,
+          suggested_value: p.phone ? null : business.owner_whatsapp,
+          note: p.phone
+            ? "Phone already set — verify it rings"
+            : "Calls are the #1 GBP action — use the number customers should reach",
+          editor_hint: "Paste into Phone under Contact",
+        };
+      case "category_primary_fix": {
+        const generic = !p.categories.primary || isGenericCategory(p.categories.primary);
+        const suggestion = p.categories.primary
+          ? categorySuggestion(p.categories.primary)
+          : null;
+        return {
+          ...base,
+          current_value: p.categories.primary,
+          suggested_value: generic ? suggestion : null,
+          note: generic
+            ? suggestion
+              ? `"${p.categories.primary}" is generic — suggested: ${suggestion}`
+              : "Pick the most specific category Google offers"
+            : "Primary category looks specific — verify it matches the core service",
+          editor_hint: "Edit profile → Business category → Primary",
+        };
+      }
+      case "category_secondary": {
+        const intel = relatedCategoryIntel(
+          p.categories.primary ? [p.categories.primary] : []
+        );
+        const extras = intel.related.slice(0, 4).map((r) => r.category);
+        return {
+          ...base,
+          current_value: p.categories.secondary.join(", ") || null,
+          suggested_value: extras.join(", ") || null,
+          editor_hint: "Edit profile → Business category → Add another category",
+        };
+      }
+      case "services": {
+        const intel = relatedCategoryIntel(
+          p.categories.primary ? [p.categories.primary] : []
+        );
+        const services = intel.related_services.slice(0, 8);
+        return {
+          ...base,
+          current_value: p.services.join(", ") || "Services not found",
+          suggested_value: services.join(", ") || null,
+          copy_text: services.join("\n") || null,
+          note: "Google matches service searches against this list",
+          editor_hint: "Edit services → paste one per line",
+        };
+      }
+      case "hours_fix":
+        return {
+          ...base,
+          current_value: hoursText || null,
+          note: p.hours.some((h) => h.anomaly)
+            ? "The 12–9 AM overnight block looks like a data-entry error — confirm real hours with the owner"
+            : "Hours look sane — verify festival/special days",
+          editor_hint: "Edit profile → Hours",
+        };
+      case "attributes_upi":
+        return {
+          ...base,
+          current_value:
+            Object.entries(p.attributes)
+              .map(([g, items]) => `${g}: ${items.join(", ")}`)
+              .join(" · ") || null,
+          note: "Add UPI/payments + accessibility attributes customers filter by",
+          editor_hint: "Edit profile → More → Attributes",
+        };
+      case "products":
+        return {
+          ...base,
+          note: "Add 3–5 products/packages with photos and prices",
+          editor_hint: "Edit profile → Products",
+        };
+      case "booking_link":
+        return {
+          ...base,
+          suggested_value: business.owner_whatsapp
+            ? `https://wa.me/${business.owner_whatsapp.replace(/\D/g, "")}`
+            : null,
+          note: "A WhatsApp deep link works as the booking link for appointment businesses",
+          editor_hint: "Edit profile → Booking",
+        };
+      case "logo_cover":
+        return {
+          ...base,
+          current_value: `${p.photos_total ?? 0} photos on profile`,
+          editor_hint: "Photos → Logo / Cover",
+        };
+      case "opening_date":
+        return { ...base, editor_hint: "Edit profile → About → Opening date" };
+      case "social_links":
+        return { ...base, editor_hint: "Edit profile → Contact → Social profiles" };
+      case "service_area":
+        return {
+          ...base,
+          note: "Only for businesses that visit customers — skip (blocked + note) if storefront-only",
+          editor_hint: "Edit profile → Location → Service area",
+        };
+      case "utm_link": {
+        const utm = site
+          ? `${site}${site.includes("?") ? "&" : "?"}utm_source=gbp&utm_medium=profile`
+          : null;
+        return {
+          ...base,
+          current_value: site ?? null,
+          suggested_value: utm,
+          copy_text: utm,
+          note: site
+            ? "Makes GBP traffic visible in analytics"
+            : "No website linked — add one first (blocked)",
+          editor_hint: "Edit profile → Contact → Website",
+        };
+      }
+      case "description":
+        return {
+          ...base,
+          current_value: p.description,
+          note: "AI draft below — approve, edit, then paste (approve-before-publish)",
+          editor_hint: "Edit profile → About → Description",
+          ai_prefill: "description",
+        };
+      case "reply_backlog": {
+        const rate = input.reviews?.stats.reply_rate_pct ?? null;
+        return {
+          ...base,
+          current_value: rate === null ? "reply rate unknown" : `${rate}% replied`,
+          note: "Use the AI Reply tool per review — approve each before posting",
+          editor_url: reviewsEditorUrl(business, input),
+          editor_hint: "Open the review list → reply from the owner account",
+        };
+      }
+      case "review_machine": {
+        const link = p.place_id
+          ? `https://search.google.com/local/writereview?placeid=${p.place_id}`
+          : null;
+        return {
+          ...base,
+          suggested_value: link,
+          copy_text: link,
+          note: "Print the QR card + send after every sale on WhatsApp",
+          editor_url: reviewsEditorUrl(business, input),
+          editor_hint: "Share the review link with happy customers",
+        };
+      }
+      case "review_velocity":
+        return {
+          ...base,
+          current_value: `${input.reviews?.stats.velocity_per_month_6m ?? 0}/month over 6 months`,
+          note: "Target 4+ new reviews every month",
+          editor_url: reviewsEditorUrl(business, input),
+          editor_hint: null,
+        };
+      case "posts_cadence":
+        return {
+          ...base,
+          current_value: input.posts
+            ? `${input.posts.stats.total} posts ever, ${input.posts.last_30d_count} in last 30 days`
+            : "no post data",
+          note: "AI draft for post #1 below — offers, tips, festivals",
+          editor_url: postsEditorUrl(business, input),
+          editor_hint: "Add update → paste the approved draft",
+          ai_prefill: "post",
+        };
+      case "website_vendor": {
+        const w = input.website;
+        const briefLines = [
+          `Website brief for ${name} (${site ?? "no site"})`,
+          w && !(w.title.has_category && w.title.has_city)
+            ? `1. Title tag → "${name} - ${p.categories.primary ?? "category"} in ${city}"`
+            : null,
+          w && !(w.meta.has_category && w.meta.has_locality)
+            ? `2. Meta description → ${w.meta.ai_suggestions[0] ?? "include category + locality"}`
+            : null,
+          w && w.category_pages.some((c) => c.matched_page === null)
+            ? `3. Create a page per GBP category: ${w.category_pages
+                .filter((c) => c.matched_page === null)
+                .map((c) => c.category)
+                .join(", ")}`
+            : null,
+          w && w.heading_skips.length > 0
+            ? `4. Fix heading hierarchy (skips: ${w.heading_skips.join(", ")})`
+            : null,
+          w && w.spelling_issues.length > 0
+            ? `5. Spelling: ${w.spelling_issues
+                .map((s) => `"${s.found}" → "${s.suggested}"`)
+                .join(", ")}`
+            : null,
+        ].filter(Boolean);
+        return {
+          ...base,
+          current_value: site ?? null,
+          copy_text: site ? briefLines.join("\n") : null,
+          note: site
+            ? "Copy the brief and send it to the website vendor"
+            : "No website — consider a basic owned-domain site (blocked until then)",
+          editor_url: null, // vendor work — no Google editor surface
+          editor_hint: null,
+        };
+      }
+      case "website_quality":
+        return {
+          ...base,
+          current_value: input.website?.rented_subdomain
+            ? `rented subdomain (${input.website.provider})`
+            : site ?? null,
+          note: input.website?.rented_subdomain
+            ? "Move from the rented subdomain to an owned domain; check SSL + mobile"
+            : "Check SSL certificate + mobile usability",
+          editor_url: null,
+          editor_hint: null,
+        };
+      case "weak_zone":
+        return {
+          ...base,
+          note: "Run a grid scan to locate the weak zone (grid is behind the live-data switch); plan: citations + service-area keywords",
+          editor_url: null,
+          editor_hint: null,
+        };
+      case "citation_nap":
+        return {
+          ...base,
+          current_value: p.phone ? null : "GBP phone missing → NAP mismatch everywhere",
+          copy_text: napBlock,
+          note: "Fix the GBP phone FIRST, then align every directory to this exact NAP block",
+          editor_url: null, // directories aren't Google editor surfaces
+          editor_hint: null,
+        };
+      case "citation_directories":
+        return {
+          ...base,
+          copy_text: `${napBlock}\n\n${DIRECTORY_SEARCHES(name, city)}`,
+          note: "Directory search links are in the copy block — align NAP on each",
+          editor_url: null,
+          editor_hint: null,
+        };
+      default:
+        return base;
     }
-    if (!w || !(w.meta.has_category && w.meta.has_locality)) {
-      const aiSuggestion = w?.meta.ai_suggestions[0] ?? null;
-      push({
-        rubric_key: "website_meta",
-        title: "Rewrite meta description",
-        change_before: w?.meta.value ?? null,
-        change_after: aiSuggestion,
-        manual: { copy_value: aiSuggestion, google_editor_url: webUrl },
-        note: "Copy brief for the website vendor",
-      });
-    }
-    if (!w || w.category_pages.some((c) => c.matched_page === null)) {
-      push({
-        rubric_key: "website_category_page",
-        title: "Create category/service pages",
-        change_before: w
-          ? w.category_pages
-              .filter((c) => c.matched_page === null)
-              .map((c) => c.category)
-              .join(", ") + " — no matching page"
-          : null,
-        change_after: null,
-        manual: { google_editor_url: webUrl },
-        note: "Copy brief for the website vendor",
-      });
-    }
-    if (!w || w.heading_skips.length > 0) {
-      push({
-        rubric_key: "website_headings",
-        title: "Fix heading hierarchy (H1→H2→H3)",
-        change_before: w?.heading_skips.join(", ") || null,
-        change_after: null,
-        manual: { google_editor_url: webUrl },
-        note: "Copy brief for the website vendor",
-      });
-    }
-    if (w && w.spelling_issues.length > 0) {
-      push({
-        rubric_key: "website_spelling",
-        title: "Fix spelling issues on site",
-        change_before: w.spelling_issues
-          .map((s) => `"${s.found}" → "${s.suggested}"`)
-          .join(", "),
-        change_after: w.spelling_issues.map((s) => s.suggested).join(", "),
-        manual: {
-          copy_value: w.spelling_issues
-            .map((s) => `${s.found} → ${s.suggested} (${s.location})`)
-            .join("\n"),
-          google_editor_url: webUrl,
-        },
-        note: null,
-      });
-    }
-  }
-
-  // ---------- Visibility ----------
-  push({
-    rubric_key: "weak_zone",
-    title: "Improve the weak map zone",
-    change_before: null,
-    change_after: null,
-    note: "Run a grid scan to locate it (grid is behind the live-data switch); plan: citations + service-area keywords",
-    manual: {
-      google_editor_url: input.profile.cid
-        ? `https://www.google.com/maps/place/?cid=${encodeURIComponent(input.profile.cid)}`
-        : profileUrl,
-    },
   });
-
-  // ---------- Citations ----------
-  for (const key of ["citation_justdial", "citation_indiamart", "citation_sulekha"] as const) {
-    const label = key.split("_")[1];
-    const pretty = label.charAt(0).toUpperCase() + label.slice(1);
-    push({
-      rubric_key: key,
-      title: key === "citation_sulekha" ? `Create ${pretty} listing` : `Fix ${pretty} listing NAP`,
-      change_before: null,
-      change_after: null,
-      note: p.phone
-        ? null
-        : "Add the phone here AFTER fixing it on GBP — NAP must match everywhere",
-      manual: {
-        copy_value: [name, p.address, p.phone].filter(Boolean).join("\n"),
-        google_editor_url: DIRECTORY_URLS[key](name, city),
-      },
-    });
-  }
-
-  return tasks;
 }

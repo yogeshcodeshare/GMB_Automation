@@ -6,17 +6,26 @@ import { finishProgress, initProgress } from "@/server/audit/progress";
 import { scoreAudit } from "@/server/score";
 import { loadManovedhFixture } from "@/server/fixtures";
 import { computePrereqs } from "@/server/sprint/prereqs";
-import { generateCatalog } from "@/server/sprint/catalog";
+import { generateCatalog, isAllowlistedEditorUrl } from "@/server/sprint/catalog";
 import {
-  assertNoBaselineTamper,
+  assertStrictPatchShape,
   createSprint,
+  customKeyFor,
+  getActiveSprintDetail,
   getSprintDetail,
   patchSprint,
-  projectedScore,
+  rubricPointsFor,
   SprintGateError,
+  SprintPatchError,
 } from "@/server/sprint/engine";
 import { buildSprintComparison, renderSprintReportHtml } from "@/server/sprint/report";
-import { sprintGroupFor, type Business, type FixTask } from "@/types";
+import {
+  projectedScore,
+  SPRINT_TASK_CATALOG,
+  sprintGroupFor,
+  type Business,
+  type SprintGroup,
+} from "@/types";
 import { miniDb, type Row } from "./helpers/mini-db";
 
 const SPRINT_TABLES = [
@@ -28,6 +37,7 @@ const SPRINT_TABLES = [
   "ai_outputs",
   "settings",
   "grid_scans",
+  "grid_points",
 ];
 
 const NOW = new Date("2026-07-17T10:00:00Z");
@@ -91,36 +101,49 @@ const scriptedAi = {
   }),
 };
 
-// ---------- prereq gate matrix (US-024) ----------
+// ---------- prereq gate matrix (US-024, LOCKED PrereqCheck shape) ----------
 
-describe("EP-021 prereq gate (server-side, per-reason failures)", () => {
+describe("EP-021 prereq gate — five PrereqCheck{ok,reason} + eligible", () => {
   const CASES: Array<{
     name: string;
+    check: keyof Pick<
+      import("@/types").SprintPrereqs,
+      | "is_client_with_plan"
+      | "owner_contact_saved"
+      | "connection_ready"
+      | "fresh_audit"
+      | "no_active_sprint"
+    >;
     mutate: (tables: Record<string, Row[]>) => void;
     expectReason: RegExp;
   }> = [
     {
       name: "prospect (not a client)",
+      check: "is_client_with_plan",
       mutate: (t) => Object.assign(t.businesses[0], { is_client: false }),
       expectReason: /prospect/,
     },
     {
       name: "client without a plan",
+      check: "is_client_with_plan",
       mutate: (t) => Object.assign(t.businesses[0], { plan: null }),
       expectReason: /no plan/,
     },
     {
       name: "owner contact missing",
+      check: "owner_contact_saved",
       mutate: (t) => Object.assign(t.businesses[0], { owner_whatsapp: null }),
       expectReason: /owner contact/,
     },
     {
       name: "no connection (none)",
+      check: "connection_ready",
       mutate: (t) => Object.assign(t.businesses[0], { connection_status: "none" }),
       expectReason: /no profile access/,
     },
     {
       name: "stale audit (9 days)",
+      check: "fresh_audit",
       mutate: (t) => {
         t.audits.length = 0;
         t.audit_scores.length = 0;
@@ -130,116 +153,198 @@ describe("EP-021 prereq gate (server-side, per-reason failures)", () => {
     },
     {
       name: "no audit at all",
+      check: "fresh_audit",
       mutate: (t) => {
         t.audits.length = 0;
         t.audit_scores.length = 0;
       },
       expectReason: /no finished audit/,
     },
+    {
+      name: "active sprint already running",
+      check: "no_active_sprint",
+      mutate: (t) => {
+        t.optimization_sprints.push({
+          id: "00000000-0000-4000-8000-00000000aaaa",
+          business_id: BIZ_ID,
+          status: "active",
+          started_at: NOW.toISOString(),
+          baseline_audit_id: "a1111111-1111-4111-8111-11111111111a",
+        });
+      },
+      expectReason: /active sprint already exists/,
+    },
   ];
 
   for (const c of CASES) {
-    it(`fails with a clear reason: ${c.name}`, async () => {
+    it(`${c.name} → ${c.check}.ok=false with the reason`, async () => {
       const { client, tables } = readyDb();
       c.mutate(tables);
+      const before = tables.optimization_sprints.length;
       const gate = await computePrereqs(client, BIZ_ID, NOW);
-      expect(gate.failures.length).toBeGreaterThan(0);
-      expect(gate.failures.join(" | ")).toMatch(c.expectReason);
+      expect(gate.prereqs.eligible).toBe(false);
+      expect(gate.prereqs[c.check].ok).toBe(false);
+      expect(gate.prereqs[c.check].reason).toMatch(c.expectReason);
       await expect(
         createSprint({ db: client, ai: scriptedAi, now: () => NOW }, BIZ_ID)
       ).rejects.toBeInstanceOf(SprintGateError);
-      expect(tables.optimization_sprints).toHaveLength(0); // nothing created
+      expect(tables.optimization_sprints.length).toBe(before); // nothing created
     });
   }
 
-  it("all four gates pass on the ready business (manager = manual-mode ack)", async () => {
+  it("ready business: eligible, all five ok, ids populated", async () => {
     const { client } = readyDb();
     const gate = await computePrereqs(client, BIZ_ID, NOW);
-    expect(gate.prereqs).toEqual({
-      is_client_with_plan: true,
-      owner_contact_saved: true,
-      connection_ready: true,
-      fresh_audit: true,
-      fresh_audit_age_days: 2,
+    expect(gate.prereqs.eligible).toBe(true);
+    for (const key of [
+      "is_client_with_plan",
+      "owner_contact_saved",
+      "connection_ready",
+      "fresh_audit",
+      "no_active_sprint",
+    ] as const) {
+      expect(gate.prereqs[key]).toEqual({ ok: true, reason: "" });
+    }
+    expect(gate.prereqs.fresh_audit_age_days).toBe(2);
+    expect(gate.prereqs.fresh_audit_id).toBe("a1111111-1111-4111-8111-11111111111a");
+    expect(gate.prereqs.active_sprint_id).toBeNull();
+  });
+
+  it("active sprint failure carries active_sprint_id (UI resumes)", async () => {
+    const { client, tables } = readyDb();
+    tables.optimization_sprints.push({
+      id: "00000000-0000-4000-8000-00000000aaaa",
+      business_id: BIZ_ID,
+      status: "active",
+      started_at: NOW.toISOString(),
+      baseline_audit_id: "a1111111-1111-4111-8111-11111111111a",
     });
-    expect(gate.failures).toEqual([]);
+    const gate = await computePrereqs(client, BIZ_ID, NOW);
+    expect(gate.prereqs.active_sprint_id).toBe("00000000-0000-4000-8000-00000000aaaa");
   });
 });
 
-// ---------- catalog ----------
+// ---------- catalog (LOCKED 23-key vocabulary) ----------
 
-describe("P12 task catalog from the Manovedh audit", () => {
+describe("P12 catalog — instantiates the LOCKED SPRINT_TASK_CATALOG", () => {
   const catalog = generateCatalog(readyBusiness() as unknown as Business, input);
 
-  it("~23 tasks across all six groups (Manovedh fails almost everything)", () => {
-    expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(25);
-    const groups = new Set(catalog.map((t) => sprintGroupFor(t.rubric_key)));
-    expect(Array.from(groups).sort()).toEqual([
-      "citations",
-      "posts",
-      "profile",
-      "reviews",
-      "visibility",
-      "website",
-    ]);
+  it("all 23 pinned keys, in catalog order", () => {
+    expect(catalog.map((c) => c.seed.rubric_key)).toEqual(
+      SPRINT_TASK_CATALOG.map((s) => s.rubric_key)
+    );
   });
 
-  it("audit findings drive the deficit tasks with change_before values", () => {
-    const by = (k: string) => catalog.find((t) => t.rubric_key === k);
-    expect(by("primary_category")?.change_before).toBe("Hospital");
-    expect(by("primary_category")?.manual.copy_value).toContain("Mental health clinic");
-    expect(by("phone")).toBeDefined(); // phone missing
-    expect(by("services")?.change_before).toBe("Services not found");
-    expect(by("services")?.manual.copy_value).toContain("Hypnotherapy");
-    expect(by("hours")?.change_before).toContain("12–9 am");
-    expect(by("utm_website")?.manual.copy_value).toContain("utm_source=gbp");
-    expect(by("reply_backlog")?.change_before).toBe("6.67% replied");
+  it("audit findings drive current/suggested values", () => {
+    const by = (k: string) => catalog.find((c) => c.seed.rubric_key === k)!;
+    expect(by("category_primary_fix").current_value).toBe("Hospital");
+    expect(by("category_primary_fix").suggested_value).toContain("Mental health clinic");
+    expect(by("primary_phone").current_value).toBeNull(); // phone missing
+    expect(by("primary_phone").suggested_value).toBe("+919000000011");
+    expect(by("services").current_value).toBe("Services not found");
+    expect(by("services").copy_text).toContain("Hypnotherapy");
+    expect(by("hours_fix").current_value).toContain("12–9 am");
+    expect(by("utm_link").suggested_value).toContain("utm_source=gbp");
+    expect(by("reply_backlog").current_value).toBe("6.67% replied");
+    expect(by("review_machine").copy_text).toContain("writereview?placeid=");
+    expect(by("website_vendor").copy_text).toContain("Website brief");
+    expect(by("citation_nap").copy_text).toContain("मनोवेध");
   });
 
-  it("every task carries a manual-mode deep link (owner edit surface)", () => {
-    for (const task of catalog) {
-      expect(task.manual.google_editor_url).toMatch(/^https:\/\//);
+  it("editor_url is allowlisted-Google-only; vendor/directory tasks are null", () => {
+    for (const c of catalog) {
+      if (c.editor_url !== null) {
+        expect(isAllowlistedEditorUrl(c.editor_url)).toBe(true);
+      }
     }
-    const kg = catalog.find((t) => t.rubric_key === "primary_category");
-    expect(kg?.manual.google_editor_url).toContain("kgmid=");
-    const jd = catalog.find((t) => t.rubric_key === "citation_justdial");
-    expect(jd?.manual.google_editor_url).toContain("justdial.com");
-    expect(jd?.manual.copy_value).toContain("मनोवेध"); // NAP block to paste
-  });
-
-  it("review-machine task carries the writereview link as copy_value", () => {
-    const rm = catalog.find((t) => t.rubric_key === "review_machine");
-    expect(rm?.manual.copy_value).toContain("writereview?placeid=");
+    const by = (k: string) => catalog.find((c) => c.seed.rubric_key === k)!;
+    expect(by("category_primary_fix").editor_url).toContain("kgmid=");
+    expect(by("reply_backlog").editor_url).toContain("search.google.com/local/reviews");
+    expect(by("website_vendor").editor_url).toBeNull();
+    expect(by("citation_directories").editor_url).toBeNull();
+    // directory links still reach the founder via copy_text
+    expect(by("citation_directories").copy_text).toContain("justdial.com");
   });
 });
 
-// ---------- create + baseline lock ----------
+// ---------- create + enriched SprintDetail ----------
 
-describe("EP-021 create — baseline locks immutably", () => {
-  it("creates the sprint with baseline + tasks + AI prefills (approved=false)", async () => {
+describe("EP-021 create — locked baseline + enriched SprintTask[]", () => {
+  it("creates with baseline{locked}, groups, prereqs echo, AI prefills", async () => {
     const { client, tables } = readyDb();
     const detail = await createSprint(
       { db: client, ai: scriptedAi, now: () => NOW },
       BIZ_ID
     );
     expect(detail.sprint.status).toBe("active");
-    expect(detail.sprint.baseline_audit_id).toBe(
-      "a1111111-1111-4111-8111-11111111111a"
-    );
+    expect(detail.baseline).toMatchObject({
+      audit_id: "a1111111-1111-4111-8111-11111111111a",
+      score: 41,
+      band: "amber",
+      locked: true,
+      captured_at: NOW.toISOString(),
+    });
     expect(detail.baseline_score).toBe(41);
-    expect(detail.tasks.length).toBeGreaterThanOrEqual(20);
-    // AI drafts persisted draft-only
+    expect(detail.tasks).toHaveLength(23);
+
+    // enriched fields
+    const desc = detail.tasks.find((t) => t.rubric_key === "description")!;
+    expect(desc.group).toBe("profile");
+    expect(desc.rubric).toBe("completeness");
+    expect(desc.approved).toBe(false); // approve-before-publish
+    expect(desc.suggested_value).toContain("मनोवेध"); // AI draft
+    expect(desc.ai_output_id).toBeTruthy();
+    expect(desc.estimate_minutes).toBe(10);
+
+    // groups: all six, catalog-ordered, with remaining_minutes
+    expect(detail.groups.map((g) => g.group)).toEqual([
+      "profile",
+      "reviews",
+      "posts",
+      "website",
+      "visibility",
+      "citations",
+    ]);
+    const profile = detail.groups[0];
+    expect(profile.total_count).toBe(14);
+    expect(profile.done_count).toBe(0);
+    expect(profile.remaining_minutes).toBeGreaterThan(0);
+
+    // prereqs echoed: active sprint now exists → no_active_sprint=false
+    expect(detail.prereqs.no_active_sprint.ok).toBe(false);
+    expect(detail.prereqs.active_sprint_id).toBe(detail.sprint.id);
+
+    // AI drafts persisted draft-only in ai_outputs
     expect(tables.ai_outputs.length).toBeGreaterThanOrEqual(1);
     expect(tables.ai_outputs.every((o) => o.approved === false)).toBe(true);
-    // the description task carries the AI prefill
-    const desc = detail.tasks.find((t) => t.rubric_key === "description");
-    expect(desc?.change_after).toContain("मनोवेध");
-    // manual links map covers the tasks
-    expect(Object.keys(detail.manual_links).length).toBeGreaterThanOrEqual(20);
   });
 
-  it("AI failure never blocks the sprint (drafts stay null)", async () => {
+  it("rubric_points: per-row sums equal the baseline gap (never exceed)", async () => {
+    const { client } = readyDb();
+    const detail = await createSprint(
+      { db: client, ai: scriptedAi, now: () => NOW },
+      BIZ_ID
+    );
+    const baselineRubric = scoreAudit(input).rubric;
+    const byRubric = new Map<string, number>();
+    for (const task of detail.tasks) {
+      if (!task.rubric) continue;
+      byRubric.set(task.rubric, (byRubric.get(task.rubric) ?? 0) + task.rubric_points);
+    }
+    for (const row of baselineRubric) {
+      const sum = byRubric.get(row.key);
+      if (sum !== undefined) {
+        expect(sum).toBe(row.max - row.points); // exact split, ≤ gap
+      }
+    }
+    // category gap 15 split over 2 category tasks → 8 + 7 (order-stable)
+    const catTasks = detail.tasks.filter((t) => t.rubric === "category");
+    expect(catTasks.map((t) => t.rubric_points).sort((a, b) => b - a)).toEqual([8, 7]);
+    // visibility task moves the grid, not the rubric
+    expect(detail.tasks.find((t) => t.rubric_key === "weak_zone")!.rubric_points).toBe(0);
+  });
+
+  it("AI failure never blocks the sprint (suggestions stay deterministic)", async () => {
     const { client, tables } = readyDb();
     const failingAi = {
       complete: async () => {
@@ -250,26 +355,10 @@ describe("EP-021 create — baseline locks immutably", () => {
       { db: client, ai: failingAi, now: () => NOW },
       BIZ_ID
     );
-    expect(detail.tasks.length).toBeGreaterThanOrEqual(20);
+    expect(detail.tasks).toHaveLength(23);
     expect(tables.ai_outputs).toHaveLength(0);
-  });
-
-  it("second active sprint on the same business is rejected", async () => {
-    const { client } = readyDb();
-    await createSprint({ db: client, ai: scriptedAi, now: () => NOW }, BIZ_ID);
-    await expect(
-      createSprint({ db: client, ai: scriptedAi, now: () => NOW }, BIZ_ID)
-    ).rejects.toThrow(/active sprint already exists/);
-  });
-
-  it("baseline tamper via PATCH body is rejected loudly", () => {
-    expect(() =>
-      assertNoBaselineTamper({ baseline_audit_id: "x" })
-    ).toThrow(/baseline is locked/);
-    expect(() =>
-      assertNoBaselineTamper({ started_at: "2020-01-01" })
-    ).toThrow(/baseline is locked/);
-    expect(() => assertNoBaselineTamper({ task_id: "fine" })).not.toThrow();
+    const desc = detail.tasks.find((t) => t.rubric_key === "description")!;
+    expect(desc.ai_output_id).toBeNull();
   });
 
   it("baseline survives task patches + completion untouched (immutable)", async () => {
@@ -278,29 +367,28 @@ describe("EP-021 create — baseline locks immutably", () => {
       { db: client, ai: scriptedAi, now: () => NOW },
       BIZ_ID
     );
-    const baselineBefore = { ...tables.optimization_sprints[0] };
-
-    const task = created.tasks[0];
+    const before = { ...tables.optimization_sprints[0] };
+    const task = created.tasks.find((t) => t.rubric_key === "hours_fix")!;
     await patchSprint({ db: client, now: () => NOW }, created.sprint.id, {
       task_id: task.id,
+      task_approved: true,
+      change_after: "Mon–Sat 10:00–20:00",
       task_status: "done",
-      task_note: "done via test",
     });
     await patchSprint({ db: client, now: () => NOW }, created.sprint.id, {
       complete_sprint: true,
     });
-
     const after = tables.optimization_sprints[0];
-    expect(after.baseline_audit_id).toBe(baselineBefore.baseline_audit_id);
-    expect(after.baseline_grid_id).toBe(baselineBefore.baseline_grid_id);
-    expect(after.started_at).toBe(baselineBefore.started_at);
+    expect(after.baseline_audit_id).toBe(before.baseline_audit_id);
+    expect(after.baseline_grid_id).toBe(before.baseline_grid_id);
+    expect(after.started_at).toBe(before.started_at);
     expect(after.status).toBe("complete");
   });
 });
 
-// ---------- patch flows ----------
+// ---------- strict PATCH shape + approve gate ----------
 
-describe("EP-021 PATCH flows", () => {
+describe("EP-021 PATCH — strict shape + approve-before-done invariant", () => {
   async function withSprint() {
     const { client, tables } = readyDb();
     const detail = await createSprint(
@@ -310,103 +398,170 @@ describe("EP-021 PATCH flows", () => {
     return { client, tables, detail };
   }
 
-  it("task status → done stamps done_at; back to todo clears it", async () => {
-    const { client, detail } = await withSprint();
-    const task = detail.tasks[0];
-    let updated = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-      task_id: task.id,
-      task_status: "done",
-    });
-    const doneTask = updated.tasks.find((t) => t.id === task.id) as FixTask;
-    expect(doneTask.status).toBe("done");
-    expect(doneTask.done_at).toBe(NOW.toISOString());
-
-    updated = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-      task_id: task.id,
-      task_status: "todo",
-    });
-    expect(updated.tasks.find((t) => t.id === task.id)?.done_at).toBeNull();
+  it("strict shape: locked keys AND unknown keys rejected", () => {
+    expect(() => assertStrictPatchShape({ baseline_audit_id: "x" })).toThrow(
+      /baseline is locked/
+    );
+    expect(() => assertStrictPatchShape({ after_audit_id: "x" })).toThrow(
+      /baseline is locked/
+    );
+    expect(() => assertStrictPatchShape({ totally_new_key: 1 })).toThrow(
+      /unknown key/
+    );
+    expect(() =>
+      assertStrictPatchShape({ task_id: "x", task_status: "done" })
+    ).not.toThrow();
   });
 
-  it("add_custom_task lands with source manual; empty patch rejected", async () => {
+  it("audit task: done WITHOUT approve → rejected; approve alone isn't enough", async () => {
+    const { client, detail } = await withSprint();
+    const task = detail.tasks.find((t) => t.rubric_key === "primary_phone")!;
+    await expect(
+      patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+        task_id: task.id,
+        task_status: "done",
+        change_after: "+919000000011",
+      })
+    ).rejects.toThrow(/approve the suggestion first/);
+    await expect(
+      patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+        task_id: task.id,
+        task_status: "done",
+        task_approved: true, // approved but no change_after recorded
+      })
+    ).rejects.toThrow(/record change_after/);
+  });
+
+  it("approve + change_after (same patch or prior) unlocks done", async () => {
+    const { client, detail } = await withSprint();
+    const task = detail.tasks.find((t) => t.rubric_key === "primary_phone")!;
+    const updated = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+      task_id: task.id,
+      task_approved: true,
+      change_after: "+919000000011",
+      task_status: "done",
+    });
+    const done = updated.tasks.find((t) => t.id === task.id)!;
+    expect(done.status).toBe("done");
+    expect(done.approved).toBe(true);
+    expect(done.done_at).toBe(NOW.toISOString());
+  });
+
+  it("custom task: {title, group} → synthesized key maps back to the group; no approval needed", async () => {
     const { client, detail } = await withSprint();
     const updated = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-      add_custom_task: { title: "Print QR standee", rubric_key: "review_machine" },
+      add_custom_task: { title: "Print QR standee", group: "reviews" },
     });
-    const custom = updated.tasks.find((t) => t.title === "Print QR standee");
-    expect(custom?.source).toBe("manual");
+    const custom = updated.tasks.find((t) => t.title === "Print QR standee")!;
+    expect(custom.source).toBe("manual");
+    expect(custom.group).toBe("reviews");
+    expect(custom.approved).toBe(true); // founder authored it
+    expect(custom.rubric_points).toBe(0);
+    expect(custom.estimate_minutes).toBeNull();
+    // done without the approve dance (manual tasks skip #4)
+    const after = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+      task_id: custom.id,
+      task_status: "done",
+    });
+    expect(after.tasks.find((t) => t.id === custom.id)!.status).toBe("done");
+  });
+
+  it("customKeyFor maps every group back through sprintGroupFor", () => {
+    const groups: SprintGroup[] = [
+      "profile",
+      "reviews",
+      "posts",
+      "website",
+      "visibility",
+      "citations",
+    ];
+    for (const g of groups) {
+      expect(sprintGroupFor(customKeyFor(g, "abc"))).toBe(g);
+    }
+  });
+
+  it("invalid group + oversized title rejected; empty patch rejected", async () => {
+    const { client, detail } = await withSprint();
+    await expect(
+      patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+        add_custom_task: { title: "x", group: "nonsense" as SprintGroup },
+      })
+    ).rejects.toBeInstanceOf(SprintPatchError);
     await expect(
       patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {})
     ).rejects.toThrow(/empty patch/);
   });
 
-  it("cross-sprint task ids do not match (scoped update)", async () => {
+  it("projected score uses rubric_points (category fix done → 41 + 8)", async () => {
     const { client, detail } = await withSprint();
-    await expect(
-      patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-        task_id: "00000000-0000-4000-8000-00000000dead",
-        task_status: "done",
-      })
-    ).rejects.toThrow(/NOT_FOUND/);
-  });
-
-  it("projected score rises as tasks complete (deterministic simulator)", async () => {
-    const { client, detail } = await withSprint();
-    expect(detail.current_projected_score).toBe(41); // nothing done yet
-    const category = detail.tasks.find((t) => t.rubric_key === "primary_category")!;
+    expect(detail.current_projected_score).toBe(41);
+    const cat = detail.tasks.find((t) => t.rubric_key === "category_primary_fix")!;
+    expect(cat.rubric_points).toBe(8); // first of two category tasks (gap 15 → 8+7)
     const updated = await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-      task_id: category.id,
+      task_id: cat.id,
+      task_approved: true,
+      change_after: "Mental health clinic",
       task_status: "done",
     });
-    // category row lost 15 points at baseline; its only task is done → +15
-    expect(updated.current_projected_score).toBe(56);
+    expect(updated.current_projected_score).toBe(49);
+    // the @/types helper agrees
+    expect(projectedScore(41, updated.tasks)).toBe(49);
   });
 
-  it("projectedScore caps at 100 and ignores unmapped keys", () => {
-    const rubric = scoreAudit(input).rubric;
-    const tasks = [
-      { rubric_key: "weak_zone", status: "done" },
-      { rubric_key: "unknown_thing", status: "done" },
-    ] as unknown as FixTask[];
-    expect(projectedScore(rubric, 41, tasks)).toBe(41);
-    expect(projectedScore(rubric, 99, [])).toBe(99);
+  it("GET ?businessId= returns the active sprint, null when none", async () => {
+    const { client, detail } = await withSprint();
+    const active = await getActiveSprintDetail({ db: client }, BIZ_ID);
+    expect(active?.sprint.id).toBe(detail.sprint.id);
+    await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
+      complete_sprint: true,
+    });
+    expect(await getActiveSprintDetail({ db: client }, BIZ_ID)).toBeNull();
+    // completed sprint still readable by id
+    const byId = await getSprintDetail({ db: client }, detail.sprint.id);
+    expect(byId?.sprint.status).toBe("complete");
   });
 });
 
-// ---------- EP-022 comparison ----------
+// ---------- EP-022 comparison (LOCKED SprintBeforeAfter) ----------
 
-describe("EP-022 before/after comparison", () => {
-  it("mid-sprint (no re-audit): baseline only + explanatory note", async () => {
+describe("EP-022 before/after — SprintBeforeAfter shape", () => {
+  it("mid-sprint (no re-audit): PARTIAL semantics — nulls + [] + change logs", async () => {
     const { client, detail } = await (async () => {
-      const { client, tables } = readyDb();
+      const { client } = readyDb();
       const detail = await createSprint(
         { db: client, ai: scriptedAi, now: () => NOW },
         BIZ_ID
       );
-      return { client, tables, detail };
+      return { client, detail };
     })();
-    const c = await buildSprintComparison(client, detail.sprint.id);
-    expect(c).not.toBeNull();
-    expect(c!.before.total).toBe(41);
-    expect(c!.after).toBeNull();
-    expect(c!.score_delta).toBeNull();
-    expect(c!.note).toContain("No re-audit");
+    const data = await buildSprintComparison(client, detail.sprint.id);
+    expect(data).not.toBeNull();
+    const r = data!.report;
+    expect(r.baseline_score).toBe(41);
+    expect(r.band_before).toBe("amber");
+    expect(r.final_score).toBeNull();
+    expect(r.score_delta).toBeNull();
+    expect(r.band_after).toBeNull();
+    expect(r.rubric_deltas).toEqual([]);
+    expect(r.grid).toBeNull();
+    expect(r.tasks_total).toBe(23);
+    expect(r.work_log).toHaveLength(23);
   });
 
-  it("after a re-audit: deltas per rubric row + field changes + work log", async () => {
+  it("after a re-audit: deltas + field changes + counts; HTML renders both gauges", async () => {
     const { client, tables } = readyDb();
     const detail = await createSprint(
       { db: client, ai: scriptedAi, now: () => NOW },
       BIZ_ID
     );
-    // founder does the work…
-    const task = detail.tasks.find((t) => t.rubric_key === "primary_category")!;
+    const task = detail.tasks.find((t) => t.rubric_key === "category_primary_fix")!;
     await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
       task_id: task.id,
-      task_status: "done",
+      task_approved: true,
       change_after: "Mental health clinic",
+      task_status: "done",
     });
-    // …and a re-audit lands AFTER sprint start with a better score
+    // a re-audit lands AFTER sprint start with the category fixed
     const improved = structuredClone(input);
     improved.profile.categories.primary = "Mental health clinic";
     const afterId = "a1111111-1111-4111-8111-11111111111c";
@@ -424,20 +579,33 @@ describe("EP-022 before/after comparison", () => {
     });
     tables.audit_scores.push({ audit_id: afterId, ...scoreAudit(improved).scores });
 
-    const c = await buildSprintComparison(client, detail.sprint.id);
-    expect(c!.after?.total).toBe(56); // 41 + the category 15
-    expect(c!.score_delta).toBe(15);
-    const catDelta = c!.rubric_deltas.find((d) => d.key === "category");
-    expect(catDelta).toMatchObject({ before: 0, after: 15, delta: 15 });
-    expect(c!.field_changes.some((f) => f.after === "Mental health clinic")).toBe(true);
-    expect(c!.work_log.length).toBeGreaterThanOrEqual(20);
+    const data = await buildSprintComparison(client, detail.sprint.id);
+    const r = data!.report;
+    expect(r.final_score).toBe(56); // 41 + category 15
+    expect(r.score_delta).toBe(15);
+    expect(r.band_after).toBe("amber");
+    const catDelta = r.rubric_deltas.find((d) => d.key === "category");
+    expect(catDelta).toMatchObject({ before: 0, after: 15, delta: 15, max: 15 });
+    expect(r.field_changes).toEqual([
+      {
+        rubric_key: "category_primary_fix",
+        title: "Replace generic primary category",
+        group: "profile",
+        rubric: "category",
+        before: "Hospital",
+        after: "Mental health clinic",
+      },
+    ]);
+    expect(r.tasks_done).toBe(1);
 
-    // report HTML: escaped, gauges for both sides, delta badge
-    const html = renderSprintReportHtml(c!);
+    const html = renderSprintReportHtml(data!, "mr");
     expect(html).toContain("▲ 15");
     expect((html.match(/class="score-gauge"/g) ?? []).length).toBe(2);
+    expect(html).toContain("सुधारणा अहवाल"); // Marathi default copy
     expect(html).toContain("Content-Security-Policy");
     expect(html).not.toMatch(/<script/i);
+    const en = renderSprintReportHtml(data!, "en");
+    expect(en).toContain("Improvement Report");
   });
 });
 
@@ -450,14 +618,13 @@ describe("M6 is vendor-free (DB + AI only)", () => {
         path.join(process.cwd(), "src", "server", "sprint", file),
         "utf-8"
       );
-      // Comments may MENTION the vendor ("zero DataForSEO calls") — imports may not.
       expect(src).not.toMatch(/from\s+["']@\/server\/dataforseo/);
       expect(src).not.toMatch(/from\s+["']@\/server\/spend/);
       expect(src).not.toMatch(/import[^;]*SpendGuard/);
     }
   });
 
-  it("create→patch→complete→report runs with fetch POISONED (no network)", async () => {
+  it("create→approve→done→complete→report runs with fetch POISONED (no network)", async () => {
     const realFetch = globalThis.fetch;
     let networkCalls = 0;
     globalThis.fetch = (async () => {
@@ -470,15 +637,18 @@ describe("M6 is vendor-free (DB + AI only)", () => {
         { db: client, ai: scriptedAi, now: () => NOW },
         BIZ_ID
       );
+      const task = detail.tasks.find((t) => t.rubric_key === "services")!;
       await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
-        task_id: detail.tasks[0].id,
+        task_id: task.id,
+        task_approved: true,
+        change_after: "Hypnotherapy, NLP therapy",
         task_status: "done",
       });
       await patchSprint({ db: client, now: () => NOW }, detail.sprint.id, {
         complete_sprint: true,
       });
-      const c = await buildSprintComparison(client, detail.sprint.id);
-      renderSprintReportHtml(c!);
+      const data = await buildSprintComparison(client, detail.sprint.id);
+      renderSprintReportHtml(data!, "mr");
       expect(networkCalls).toBe(0);
       const readBack = await getSprintDetail({ db: client }, detail.sprint.id);
       expect(readBack?.sprint.status).toBe("complete");
