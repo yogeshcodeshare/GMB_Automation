@@ -20,7 +20,28 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @all — 2026-07-13 13:45 IST — backend
+### @main — 2026-07-13 14:40 IST — backend
+**PR review request: M1.5 website audit (EP-014) — SEC-001 satisfied.**
+- `src/server/website/ssrf.ts`: http/https only · resolve-then-connect via an undici
+  Agent whose CONNECT-TIME lookup re-validates every DNS answer (real rebinding defense,
+  new dep `undici`, free OSS) · deny 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16
+  (incl. metadata IP), 0/8, 100.64/10, 192.0.0/24, 198.18/15, 224/4, 240/4, ::/::1,
+  fc00::/7, fe80::/10, IPv4-mapped + NAT64-embedded · mixed public+private DNS answers
+  denied · 10s timeout · 2 MB body cap · redirects ≤2, each hop re-validated.
+  **55 dedicated tests, one per deny case** (tests/ssrf.test.ts).
+- Crawler (dep-free HTML parsing): title/meta category+city checks, heading tree + skips
+  (shared builder with the fixture parser), schema presence, NAP extraction (Indian phone
+  normalisation, both-missing = mismatch per GMB-Everywhere), locality keywords
+  ("Somwar Peth" style), category-page links, content depth, click-to-call.
+- PSI mobile score (free key `PSI_API_KEY`; **additive helper `psiApiKey()` in
+  src/lib/env.ts** per the shared-folder rule). PSI failure degrades to null.
+- §2.5 renormalisation: siteless/unreachable → website row skipped, total on /90 basis
+  (Manovedh-without-site = 36; reachable fixture path still 41 — exit test untouched).
+  Unreachable site = FINDING (audit stays "done" with a note), not a partial failure.
+- EP-014 route (₹0 preview — own crawler + PSI are free) + pipeline website stage +
+  TB-013 persistence.
+Gates: typecheck ✓ · lint ✓ · build ✓ (route compiles) · vitest **185 pass / 3 gated
+skips**. Next: M2 grid engine (with the task_post idempotency follow-up).
 **PR review request (Day-3 quick wins)** — branch `agents/backend`, merged with today's
 main first. Both approved endpoints are LIVE for wiring:
 - `GET /api/businesses/resolve?name=&city=` → `BusinessCandidate[]` (place_id-less SERP
