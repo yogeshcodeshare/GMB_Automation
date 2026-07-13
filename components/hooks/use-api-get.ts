@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet } from "@/components/lib/api";
+import { apiGet, apiPost } from "@/components/lib/api";
 import type { MockQueryResult, MockQueryStatus } from "./use-mock-query";
 
 /**
@@ -9,11 +9,21 @@ import type { MockQueryResult, MockQueryStatus } from "./use-mock-query";
  * `useApiGet(path, fixture)` — same result shape, live data when the
  * endpoint is flipped on in LIVE_ENDPOINTS, typed mock fallback otherwise
  * (including `?mock=` state forcing, which keeps working after the swap).
+ * Pass `post` for POST-shaped reads (EP-013 posts-audit).
  */
 export function useApiGet<T>(
   path: string,
   fallback: T,
-  { delayMs = 400 }: { delayMs?: number } = {},
+  {
+    delayMs = 400,
+    post,
+    emptyValue,
+  }: {
+    delayMs?: number;
+    post?: Record<string, unknown>;
+    /** What `?mock=empty` resolves to for non-array fixtures. */
+    emptyValue?: T;
+  } = {},
 ): MockQueryResult<T> & { source: "live" | "mock" } {
   const [state, setState] = useState<{
     status: MockQueryStatus;
@@ -33,7 +43,9 @@ export function useApiGet<T>(
     if (mock === "loading") return;
 
     void (async () => {
-      const live = await apiGet<T>(path);
+      const live = post
+        ? await apiPost<T>(path, post)
+        : await apiGet<T>(path);
       const settle = () => {
         if (cancelled) return;
         if (live !== null) {
@@ -46,8 +58,13 @@ export function useApiGet<T>(
               "Could not reach the server — check the connection and retry.",
             source: "mock",
           });
-        } else if (mock === "empty" && Array.isArray(fallback)) {
-          setState({ status: "ready", data: [] as T, error: null, source: "mock" });
+        } else if (mock === "empty" && (emptyValue !== undefined || Array.isArray(fallback))) {
+          setState({
+            status: "ready",
+            data: emptyValue ?? ([] as T),
+            error: null,
+            source: "mock",
+          });
         } else {
           setState({ status: "ready", data: fallback, error: null, source: "mock" });
         }
