@@ -20,6 +20,40 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-16 09:40 IST — main
+**PR #18 MERGED — CR-1 live-data master switch (backend).** Verified: fail-safe OFF
+(missing column/row/read-error all → false, so no paid call reaches the vendor even
+pre-migration), defense-in-depth (route `assertLiveDataEnabled` + client-entry gate),
+previews/free calls unaffected; `live-gate` test proves paid methods throw
+`LIVE_DATA_DISABLED` with zero transport + zero ledger. Your 3 CR-1 sub-proposals resolved:
+- ✅ `ErrorCode += "LIVE_DATA_DISABLED"` added to `@/types` (503) — drop the temporary cast.
+- ✅ Migration already shipped as mine `20260716000001_dataforseo_live_enabled.sql` (@Yogesh apply).
+- ✅ `GET/PATCH /api/settings` added to API_CONTRACT.md (P11 Data-sources toggle, founder-auth).
+So the go-live sequence is: verify DFS account (support chat, 40104) → apply the migration →
+`PATCH /api/settings {dataforseo_live_enabled:true}` → flip the paid `LIVE_ENDPOINTS` keys.
+
+### @all — 2026-07-16 09:00 IST — main
+**DAY 5 = INTEGRATION DAY. DB IS CURRENT — no more schema blockers.** Client applied all 3
+migrations; I verified them LIVE (`tests/schema-sanity.test.ts`): `grid_points.top_ranks` ✓,
+`businesses.is_demo` (6 seed rows flagged) ✓, `ai_outputs` accepts `'fixes'` ✓. GitHub
+Actions now enabled (CI fires on this push). **🎯 MVP GATE MET** — Yogesh approved the PDF
+(both halves pass). @all: `git merge origin/main` before your next push.
+- **⛔ DataForSEO is STILL 403 (40104) — the email step was NOT enough** (see backend 19:40
+  note). Per that, the account needs the in-panel/support verification, not just the email
+  link. **Consequence for today:** the ₹0/DB integration flips (stats, businesses, spend,
+  reviews) proceed now; the PAID flips (resolve, audit, posts, grid) stay MOCK-gated until
+  DFS clears. @Yogesh: open the support chat at app.dataforseo.com, quote 40104.
+- **CR-1 shipped (migration + type):** **`20260716000001_dataforseo_live_enabled.sql`** —
+  adds `settings.dataforseo_live_enabled` boolean (default **false**) + the field on the
+  `Settings` type. Runtime kill-switch: even once the account verifies, live calls stay OFF
+  until the founder flips this. @Yogesh apply the migration. **@backend — wire the enforcement:**
+  read `settings.dataforseo_live_enabled` in the dfs client's PAID path and refuse with a clear
+  disabled error when false (free balance ping unaffected). Small change; needed before any
+  live flip.
+- **@frontend — flip the ₹0 registry keys now** per `DAY5_INTEGRATION.md`:
+  `/api/dashboard/stats`, `/api/businesses`, `/api/spend/today`, `/api/reviews` → `true`
+  (mock fallback stays). Verify each against the live seed data, one commit per flip.
+- CR-2 / CR-3: awaiting specs from the PM — will relay when defined.
 ### @main — 2026-07-15 15:05 IST — backend
 **PR review request: CR-1 live-data master switch — server-enforced, DEFAULT OFF.**
 - Enforced at the DataForSeoClient entry beside SpendGuard: `liveGate` runs BEFORE the

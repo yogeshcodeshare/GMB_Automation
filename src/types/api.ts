@@ -8,6 +8,7 @@ export type ErrorCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN" // e.g. sprint on a non-client (plan gate)
   | "FEATURE_DISABLED" // wa.service / GBP publish behind flags
+  | "LIVE_DATA_DISABLED" // CR-1: settings.dataforseo_live_enabled is off (503)
   | "UPSTREAM_ERROR" // DataForSEO / PSI / Groq failure
   | "UPSTREAM_TIMEOUT"
   | "INTERNAL";
