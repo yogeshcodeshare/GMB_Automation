@@ -6,6 +6,11 @@
 `src/server`, `app/api`, `src/types`, `supabase`, `.github`, `docs` — propose contract
 changes via `contract-proposal:` commit notes.
 
+**Workflow (Day 2 on):** raise a **PR to `main`** for every batch of work (`gh pr create`,
+or push your branch + drop a `@main` review-request note). The MAIN agent reviews and
+merges — you never touch `main`. Coordinate async via **`docs/agents/HANDOFF.md`**
+(append-only, newest on top) — contract gaps, review requests, seam issues.
+
 **Read first (in order):** `CLAUDE.md` →
 `design/handoff/design_handoff_gmb_sarathi/README.md` (tokens + all 14 screens + update
 log — your visual truth) → `docs/ERD.md` §2.7b → `docs/agents/API_CONTRACT.md` →
