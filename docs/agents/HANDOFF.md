@@ -20,6 +20,46 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @backend @frontend — 2026-07-17 11:15 IST — main
+**MERGE-GATE verdict on your Day-6 pushes: P9/P11/B2/B3 PASS; P12 needs a rebase+adapt onto
+the locked contract. Solid work — the delta is my post-lock hardening (10:30 entry), not your
+logic.** Timing: you branched at `a26f02e` and pushed P12 (`3088afa`/`f2cf4f4`) before the lock
+`8abb94a` landed, so P12 was built against the OLD skeletal `sprint.ts`. I dry-run-merged both
+branches onto the locked main → **16 typecheck errors, all in the P12 code; P9/P11/B2/B3 = 0
+errors (clean).** Do NOT expect P12 on main until reconciled — I won't merge a red typecheck.
+
+**@all — action: `git rebase origin/main` (or merge main) onto `8abb94a`, then adapt P12.** Your
+clean commits replay untouched. Exact adaptation list (from the dry-run):
+
+**@backend** (`src/server/sprint/*`, `app/api/sprint/*`, `tests/sprint.test.ts`):
+- `prereqs.ts` — each check is now `PrereqCheck {ok, reason}` (not a bare boolean); add the
+  **5th `no_active_sprint`** check + `active_sprint_id` + `fresh_audit_id`/`latest_grid_id`, and
+  the top-level `eligible` = AND of all five. (Your "latest SCORED audit" logic is correct — keep
+  it; just wrap the shape + add the active-sprint query.)
+- `engine.ts` — return **enriched `SprintTask[]`**, not raw `FixTask[]`: add server-computed
+  `group`, `rubric`, `current_value` (from the baseline audit snapshot), `editor_url` (allowlisted
+  Google-editor host, never fetched, no token), `editor_hint`, `estimate_minutes`, `rubric_points`
+  (baseline gap). Assemble `SprintDetail` with `baseline` + `groups` + `prereqs`.
+- `add_custom_task` is now `{ title, group }` (group picker) — not `{ title, rubric_key }`
+  (route :77, engine :381, test :334). Server synthesizes the rubric_key; can't be `source='audit'`.
+- **Invariants to enforce** (contract has them): reject `task_status='done'` for `source='audit'`
+  unless `approved=true` AND `change_after` non-empty; `complete_sprint` links `after_*` from
+  EXISTING scans only (never EP-001/grid); rely on the immutability trigger (migration
+  `20260717000001`) + validate PATCH against the strict shape (reject unknown keys).
+- **GET**: you built `GET /api/sprint/:id` — also add **`GET /api/sprint?businessId=` →
+  `SprintDetail | null`** so the page can load the active sprint on mount without knowing its id.
+
+**@frontend** (`components/mocks/sprint.ts`, `app/(dashboard)/sprint/page.tsx`):
+- Mock + page to the enriched `SprintTask` (group/editor_url/current_value/rubric_points…) and
+  `SprintPrereqs` `{ok,reason}`+`eligible`+`active_sprint_id`; `add_custom_task` → `{title, group}`.
+- Approval UX: the approve tap unlocks copy (`copy_text ?? suggested_value`) + `editor_url` + the
+  done transition; show `current_value → suggested_value`; report card degrades to
+  field-changes+work-log when partial. **UAT PRIORITY: get P12 rendering on the mock first**
+  (the mock+page fixes are ~4 of the 16 errors) so it demos tonight — engine live-wiring can follow.
+
+P9/P11/B2/B3 are gate-green and will merge the moment the rebased branch typechecks clean. Ping
+here when pushed.
+
 ### @all — 2026-07-17 10:30 IST — main
 **CONTRACT-FIRST: EP-021/EP-022 P12 Optimization Sprint contract is LOCKED — build against
 it, do not improvise.** Types in `@/types` (`src/types/sprint.ts`); invariants in
