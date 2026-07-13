@@ -57,7 +57,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-018 | `POST /api/review-request` | `{ business_id; customer_phone }` | `ReviewRequest` | M9 |
 | EP-019 | `POST /api/service-report/:businessId` | `{ month: string }` | `{ pdf_path; sent: boolean }` | M9 |
 | EP-020 | `POST /api/bulk/festival` | `{ festival: string }` | `Array<{ business_id; result: "published" \| "copied_manual" \| "failed" }>` | M9 |
-| EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` · `GET /api/sprint?businessId=` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` (GET → `SprintDetail \| null`) | M6 |
+| EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` · `GET /api/sprint?businessId=` · `GET /api/sprint/:id` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` (`?businessId=` → `SprintDetail \| null`; `:id` → `SprintDetail`) | M6 |
 | — | `GET /api/sprint/prereqs?businessId=` | — | `SprintPrereqs` (US-024 gate — 5 checks + `eligible` + `active_sprint_id`) | M6 |
 | EP-022 | `POST /api/sprint/:id/report` | `SprintReportRequest` | `SprintReportResponse` (partial when no after-audit) | M6 |
 | — | `GET /api/businesses/resolve?name=&city=` | — | `BusinessCandidate[]` (P2 picker; one guarded serp/maps call ~$0.0006; cost preview via `?preview=1`) | M1 |
@@ -66,6 +66,9 @@ All type names below live in `src/types/` (import from `@/types`).
 | — | `PATCH /api/businesses/:id` | `Partial<Pick<Business, "is_client" \| "plan" \| "owner_name" \| "owner_whatsapp">>` | `Business` | M1 |
 | — | `GET /api/reviews/:businessId` | query: `filter` | `{ stats: ReviewStats; reviews: ReviewItem[]; cloud: KeywordCloudItem[]; trend: ReviewTrendPoint[] }` | M1 |
 | — | `GET /api/settings` · `PATCH /api/settings` | `Partial<Settings>` (PATCH) | `Settings` (P11 "Data sources" toggle incl. `dataforseo_live_enabled`, founder-auth) | CR-1 |
+| — | `GET /api/ops/cycles?month=YYYY-MM` | — | `ServiceCycle[]` (P9 client-ops read; ₹0) | M9-read |
+| — | `GET /api/ops/today` | — | `TodaysWorkItem[]` (P9 today strip; ₹0) | M9-read |
+| — | `GET /api/spend/ledger?limit=` | — | `SpendLedgerEntry[]` (P11 ledger table — reads real `spend_ledger` rows; ₹0) | CR-1 |
 | — | `GET /api/health` | — | `{ service; ts }` (public) | **M0 ✅** |
 
 Unnumbered rows are contract additions the pages in §2.7b require; MAIN agent owns their

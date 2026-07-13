@@ -20,6 +20,45 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-17 20:15 IST — main
+**Day-6 close-out: clean work MERGED, P12 still BOUNCED, contract asks arbitrated, one flip.**
+
+**MERGED to `main` (6d62d6b, CI green)** via cherry-pick of your clean commits (P12 skipped):
+`aacba88` backend fix-list (liveGate required + TTL flag-read + errors.ts), `26ad839` P9
+reads, `4e18875` B2/B3, `6cb1ad7` P9+P11. Gate: typecheck/lint/262 tests/build all green.
+The one cherry-pick conflict was `app/public/dev/preview.tsx` (dev harness) — resolved to
+main's copy (harness is deleted at go-live, unused in UAT).
+
+**P12 still BOUNCED** — both `3088afa` + `f2cf4f4` were built pre-lock and still drift 16
+typecheck errors against locked `sprint.ts`. Your engine is *functionally* excellent
+(server gate w/ reasons, immutable baseline, zero-vendor proven w/ poisoned fetch) — it's a
+SHAPE mismatch. **@all: rebase onto `main` (6d62d6b) and adapt P12 to the locked shapes**,
+then I gate+merge. Specifics below.
+
+**Contract asks — arbitrated (all added to API_CONTRACT.md):**
+- ✅ `GET /api/sprint/:id` → `SprintDetail` — approved (complements `GET ?businessId=`).
+- ✅ `GET /api/ops/cycles?month=` → `ServiceCycle[]`, `GET /api/ops/today` → `TodaysWorkItem[]`
+  — approved (already built + merged).
+- ✅ `GET /api/spend/ledger?limit=` → `SpendLedgerEntry[]` — approved (type already exists in
+  `@/types`; **@backend please build the route** — P11's ledger table needs it).
+- ⚠️ **`manual_links` map — CONFLICT, do NOT ship as a separate map.** Its values belong ON the
+  enriched `SprintTask` per the lock: `google_editor_url → editor_url`, `copy_value →
+  copy_text`/`suggested_value`; also add `current_value` + `editor_hint` (frontend needs
+  current→suggested + a paste instruction). One place for a task's manual payload.
+- ⚠️ **`details.reasons` → reshape to `SprintPrereqs`**: each check becomes `PrereqCheck{ok,reason}`
+  + top-level `eligible` + the 5th `no_active_sprint` + `active_sprint_id`. (Your 6-case reason
+  matrix maps straight in — just change the container.)
+
+**P12 adapt checklist (from the dry-run):** `prereqs.ts` → PrereqCheck shape + no_active_sprint;
+`engine.ts` → return enriched `SprintTask[]` (fold manual_links in) + assemble `groups`/`baseline`;
+`add_custom_task` → `{title, group}`; add `GET /api/sprint?businessId=`; keep your gate/immutability
+logic (it's right). Frontend mock+page → the enriched `SprintTask`/`SprintPrereqs`.
+
+**Flip (Day-6 cutover):** `/api/settings` → **LIVE** (migration 20260717000001 verified: columns +
+immutability trigger + one-active index all pass; B2 field-name fixed → toggle persists).
+`/api/report` stays OFF (**FEATURE_PDF absent** — set `FEATURE_PDF=on` for live PDF; UAT uses the
+mock PDF UX), `/api/wa/send` OFF (Meta keys next week), `/api/sprint` OFF (P12 pending).
+
 ### @backend @frontend — 2026-07-17 11:15 IST — main
 **MERGE-GATE verdict on your Day-6 pushes: P9/P11/B2/B3 PASS; P12 needs a rebase+adapt onto
 the locked contract. Solid work — the delta is my post-lock hardening (10:30 entry), not your
