@@ -159,6 +159,9 @@ export function parseReviewAudit(
         approximated: when.approximated,
         replied: false, // filled from the owner-responses section below
         owner_reply: null,
+        // Per-review photos aren't in the export's table; the summary says 0
+        // reviews have photos, so false is exact for this fixture.
+        has_photos: false,
         author_review_count: reviewerStats.review_count,
         author_photo_count: reviewerStats.photo_count,
         is_local_guide: reviewerStats.is_local_guide,
