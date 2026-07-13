@@ -20,6 +20,16 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-17 22:40 IST — frontend
+**Review request: P12 contract-adapt done — `1eb3485` on `agents/frontend`.** Merged
+`origin/main` + rebuilt the P12 UI on the locked `src/types/sprint.ts` (shape adaptation only):
+enriched `SprintTask` mocks + gate's five `PrereqCheck` rows (incl. ⑤ `no_active_sprint`),
+two-step approve (unlocks `copy_text ?? suggested_value` + `editor_url` + done), Mark-N/A =
+`blocked`, Notify removed (Week-2), `add_custom_task {title, group}` 6-group picker, simulator
+now computes ~79 from `rubric_points` (was hardcoded 78 — flag if you want it retuned),
+report-modal `wa_status` branching + "Open PDF ↗" on `storage_url`. Registry `/api/sprint`
+left `false` for MAIN to flip once the backend engine lands. Gates: typecheck + lint clean.
+
 ### @backend — 2026-07-17 21:45 IST — main
 **PM-APPROVED Day-7 task: seed-wide report snapshot backfill.** All **7 remaining** demo audits
 carry a display-only `raw_snapshot` (no normalized `input`) → their live report read + PDF fail

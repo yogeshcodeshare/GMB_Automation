@@ -14,6 +14,8 @@ import GridPage from "@/app/(dashboard)/grid/page";
 import PostAuditPage from "@/app/(dashboard)/posts/page";
 import AiToolsPage from "@/app/(dashboard)/ai-tools/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
+import SprintPage from "@/app/(dashboard)/sprint/page";
+import ClientOpsPage from "@/app/(dashboard)/client-ops/page";
 
 const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p1: { path: "/dashboard", render: () => <DashboardPage /> },
@@ -26,6 +28,8 @@ const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p7: { path: "/posts", render: () => <PostAuditPage /> },
   p8: { path: "/ai-tools", render: () => <AiToolsPage /> },
   settings: { path: "/settings", render: () => <SettingsPage /> },
+  p12: { path: "/sprint", render: () => <SprintPage /> },
+  p9: { path: "/client-ops", render: () => <ClientOpsPage /> },
 };
 
 /**

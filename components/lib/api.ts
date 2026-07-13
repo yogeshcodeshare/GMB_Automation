@@ -23,11 +23,12 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   // fixed ({ dataforseo_live_enabled }) — flipped LIVE by MAIN (Day-6 close-out).
   "/api/settings": true,
   // report LIVE: FEATURE_PDF=on + EP-006 verified e2e (3 langs, real PDF + signed
-  // URL) on the backfilled manovedh audit. wa OFF (Meta keys next week); sprint
-  // OFF (EP-021 bounced for contract-adapt).
+  // URL) on the backfilled manovedh audit. wa OFF (Meta keys next week).
   "/api/report": true,
   "/api/wa/send": false,
-  "/api/sprint": false,
+  // sprint LIVE: EP-021/022 engine + P12 UI both adapted to the locked contract
+  // and merged (typecheck clean); flipped by MAIN so the client can re-test P12.
+  "/api/sprint": true,
 };
 
 function liveKey(path: string): string {
