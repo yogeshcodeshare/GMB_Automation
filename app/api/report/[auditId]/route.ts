@@ -1,7 +1,13 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildAuditReport } from "@/server/audit/report";
 import { getAuditWithScores, getBusiness } from "@/server/audit/repo";
-import { renderPdf, renderReportHtml, uploadReport } from "@/server/pdf";
+import {
+  PDF_LANGUAGES,
+  renderPdf,
+  renderReportHtml,
+  uploadReport,
+  type PdfLanguage,
+} from "@/server/pdf";
 import { err, errFrom, ok, readJson } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +23,18 @@ export async function POST(
   if (!UUID_RE.test(params.auditId)) {
     return err("VALIDATION_ERROR", "auditId must be a UUID");
   }
-  const raw = await readJson(req);
-  const lang = (raw as { lang?: unknown } | undefined)?.lang;
-  if (lang !== "mr" && lang !== "en") {
-    return err("VALIDATION_ERROR", 'lang must be "mr" or "en"');
+  // CR-3: `language` (mr | en | hinglish, default mr); legacy `lang` accepted.
+  const raw = (await readJson(req)) as
+    | { language?: unknown; lang?: unknown }
+    | undefined;
+  const requested = raw?.language ?? raw?.lang ?? "mr";
+  if (!PDF_LANGUAGES.includes(requested as PdfLanguage)) {
+    return err(
+      "VALIDATION_ERROR",
+      `language must be one of: ${PDF_LANGUAGES.join(", ")}`
+    );
   }
+  const lang = requested as PdfLanguage;
 
   try {
     const db = createServiceClient();

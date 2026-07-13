@@ -77,3 +77,58 @@ describe("MS4-T01 — Marathi report content", () => {
     expect(en).not.toContain("पहिली ५ कामे");
   });
 });
+
+describe("CR-2 — half-ring score gauge", () => {
+  const report = manovedhReport();
+  const html = renderReportHtml(report, "mr");
+
+  it("renders the SVG arc with the amber band token for 41", () => {
+    expect(html).toContain('class="score-gauge"');
+    expect(html).toContain('data-band="amber"');
+    expect(html).toContain('stroke="#d97706"'); // amber arc
+    // arc fill ∝ score: 41% of π·80 ≈ 103.04
+    expect(html).toMatch(/stroke-dasharray="103\.0\d 251\.33"/);
+    expect(html).toContain(">41</text>"); // score centred in the gauge
+  });
+
+  it("band colors follow the thresholds", () => {
+    const green = manovedhReport();
+    green.scores.total = 85;
+    green.band = "green";
+    expect(renderReportHtml(green, "en")).toContain('stroke="#16a34a"');
+    const red = manovedhReport();
+    red.scores.total = 20;
+    red.band = "red";
+    expect(renderReportHtml(red, "en")).toContain('stroke="#dc2626"');
+  });
+});
+
+describe("CR-3 — language variants", () => {
+  const report = manovedhReport();
+
+  it("mr: Devanagari labels", () => {
+    const html = renderReportHtml(report, "mr");
+    expect(html).toContain("तुमचा Google स्कोअर");
+    expect(html).toContain("तपासणी यादी");
+    expect(html).toMatch(/[ऀ-ॿ]/);
+  });
+
+  it("en: English labels, no Marathi headers", () => {
+    const html = renderReportHtml(report, "en");
+    expect(html).toContain("Your Google Score");
+    expect(html).toContain("Checklist");
+    expect(html).not.toContain("तपासणी यादी");
+  });
+
+  it("hinglish: Latin-script Marathi labels; en fix lines as fallback", () => {
+    const html = renderReportHtml(report, "hinglish");
+    expect(html).toContain("Tumcha Google Score");
+    expect(html).toContain("Tapasni Yaadi");
+    expect(html).toContain("He Turant Sudhara");
+    expect(html).toContain("Pahili 5 Kaame");
+    // fixes borrow the en list until curated Hinglish copy lands
+    expect(html).toContain("Replace the generic primary category");
+    // business name stays Devanagari — that's data, not copy
+    expect(html).toContain("मनोवेध");
+  });
+});
