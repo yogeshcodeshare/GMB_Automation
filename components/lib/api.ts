@@ -19,9 +19,14 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   // Paid / gated on DataForSEO verification (CR-1 deferred — stay OFF):
   "/api/businesses/resolve": false,
   "/api/posts-audit": false,
-  // No confirmed route yet — CR-1 toggle persists via local state until then:
-  "/api/settings": false,
+  // CR-1 toggle persists now: migration 20260717000001 applied + B2 field-name
+  // fixed ({ dataforseo_live_enabled }) — flipped LIVE by MAIN (Day-6 close-out).
+  "/api/settings": true,
+  // OFF: report needs FEATURE_PDF=on (absent); wa needs Meta keys (next week);
+  // sprint needs the P12 backend merged (EP-021 bounced for contract-adapt).
   "/api/report": false,
+  "/api/wa/send": false,
+  "/api/sprint": false,
 };
 
 function liveKey(path: string): string {
@@ -89,10 +94,21 @@ export async function apiGet<T>(path: string): Promise<T | null> {
 
 /** POST helper (EP-013 posts-audit, EP-005 ai/generate, EP-006 report…). */
 export async function apiPost<T>(path: string, body: unknown): Promise<T | null> {
-  const r = await apiFetchResult<T>(path, {
+  const r = await apiPostResult<T>(path, body);
+  return r.ok ? r.data : null;
+}
+
+/**
+ * POST that keeps the error code — for flows that branch on the envelope
+ * (EP-007 wa/send renders FEATURE_DISABLED as "WhatsApp arriving soon").
+ */
+export function apiPostResult<T>(
+  path: string,
+  body: unknown,
+): Promise<ApiResult<T>> {
+  return apiFetchResult<T>(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return r.ok ? r.data : null;
 }
