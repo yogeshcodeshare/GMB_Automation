@@ -1,5 +1,4 @@
 import type { AreaOwnershipRow, RankEntry } from "@/types";
-import { haversineKm, roundKm } from "@/server/audit/geo";
 import type { RawMapsItem } from "@/server/dataforseo/types";
 import { normalizeForMatch } from "@/server/website/html";
 
@@ -111,37 +110,34 @@ export function weakDirection(
   return w.avg >= overall + 2 ? w.dir : null;
 }
 
-/** "Who owns this area" (P5): aggregate every pin's top-20 per business. */
+/**
+ * "Who owns this area" (P5) — DERIVED ON READ from the per-pin RankEntry
+ * packs persisted in grid_points.top_ranks (contract lock, 14 Jul).
+ * distance_km is null for competitors (the packs carry no coordinates —
+ * flagged in HANDOFF); the target's own distance is 0 by definition.
+ */
 export function buildOwnership(
-  perPoint: Array<{ items: RawMapsItem[] }>,
-  target: TargetRef & { lat: number | null; lng: number | null },
+  perPointPacks: RankEntry[][],
   limit = 10
 ): AreaOwnershipRow[] {
   interface Acc {
     name: string;
     ranks: number[];
-    lat: number | null;
-    lng: number | null;
     isTarget: boolean;
   }
   const acc = new Map<string, Acc>();
-  for (const point of perPoint) {
-    for (const item of point.items) {
-      if (!item.title) continue;
-      const rank = item.rank_group ?? item.rank_absolute;
-      if (!rank || rank > 20) continue;
-      const key = item.cid ?? normalizeForMatch(item.title);
-      const entry = acc.get(key) ?? {
-        name: item.title,
+  for (const pack of perPointPacks) {
+    for (const entry of pack) {
+      if (!entry.name || entry.position > 20) continue;
+      const key = entry.cid ?? normalizeForMatch(entry.name);
+      const a = acc.get(key) ?? {
+        name: entry.name,
         ranks: [],
-        lat: item.latitude ?? null,
-        lng: item.longitude ?? null,
-        isTarget:
-          (target.cid !== null && item.cid === target.cid) ||
-          (target.place_id !== null && item.place_id === target.place_id),
+        isTarget: entry.is_target,
       };
-      entry.ranks.push(rank);
-      acc.set(key, entry);
+      a.ranks.push(entry.position);
+      a.isTarget = a.isTarget || entry.is_target;
+      acc.set(key, a);
     }
   }
   const rows: AreaOwnershipRow[] = [];
@@ -152,10 +148,7 @@ export function buildOwnership(
       best_rank: Math.min(...a.ranks),
       worst_rank: Math.max(...a.ranks),
       top3_count: a.ranks.filter((r) => r <= 3).length,
-      distance_km:
-        a.lat !== null && a.lng !== null && target.lat !== null && target.lng !== null
-          ? roundKm(haversineKm(target.lat, target.lng, a.lat, a.lng))
-          : null,
+      distance_km: a.isTarget ? 0 : null,
       is_target: a.isTarget,
     });
   });

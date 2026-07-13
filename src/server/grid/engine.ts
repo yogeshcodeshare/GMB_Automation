@@ -26,31 +26,18 @@ import {
   type TargetRef,
 } from "./metrics";
 
-/** EP-003/004 — grid scan / Teleport engine (MS2-T01..T07). */
+/**
+ * EP-003/004 — grid scan / Teleport engine (MS2-T01..T07).
+ * Persistence per the locked Day-3 contract: pins live in TB-005 with the
+ * per-point RankEntry pack in `grid_points.top_ranks` (jsonb, migration
+ * 20260713000001); ownership / weak-direction / pin popovers are DERIVED ON
+ * READ — no scan-level blob.
+ */
 
 export interface GridDeps {
   dfs: DataForSeoClient;
   db: SupabaseClient;
 }
-
-/** Per-pin detail (popovers) + ownership snapshot. Persisted into
- * grid_scans.results (jsonb, proposed migration) so EP-004 answers after a
- * restart; kept in this registry as the fallback until the column lands. */
-interface ScanResults {
-  points_detail: Array<{
-    lat: number;
-    lng: number;
-    rank: number | null;
-    distance_km: number;
-    direction: string;
-    top5: RankEntry[];
-  }>;
-  ownership: ReturnType<typeof buildOwnership>;
-  weak_direction: string | null;
-  in_top3_pct: number;
-  teleport_top10: RankEntry[] | null;
-}
-const resultsRegistry = new Map<string, ScanResults>();
 
 const POINT_CONCURRENCY = 8;
 
@@ -96,14 +83,14 @@ export async function startGridScan(
   const business = businessRow as Business;
 
   const isTeleport = req.grid_size === 1;
-  const center: LatLng | null = isTeleport
+  const pin: LatLng | null = isTeleport
     ? req.lat !== undefined && req.lng !== undefined
       ? { lat: req.lat, lng: req.lng }
       : null
     : business.lat !== null && business.lng !== null
       ? { lat: business.lat, lng: business.lng }
       : null;
-  if (!center) {
+  if (!pin) {
     throw new Error(
       isTeleport
         ? "VALIDATION:teleport needs lat + lng (the pin to stand on)"
@@ -125,15 +112,11 @@ export async function startGridScan(
   if (scanErr) throw new Error(`grid scan insert failed: ${scanErr.message}`);
   const scanId = (scanRow as GridScan).id;
 
-  const done = runScan(deps, scanId, business, req, center).catch(async (e) => {
-    await db
-      .from("grid_scans")
-      .update({ status: "failed" })
-      .eq("id", scanId);
+  const done = runScan(deps, scanId, business, req, pin).catch(async (e) => {
+    await db.from("grid_scans").update({ status: "failed" }).eq("id", scanId);
     throw e;
   });
-  // Callers may fire-and-forget; the row carries the failure state.
-  done.catch(() => undefined);
+  done.catch(() => undefined); // routes fire-and-forget; the row carries state
 
   return { scan_id: scanId, done };
 }
@@ -143,17 +126,13 @@ async function runScan(
   scanId: string,
   business: Business,
   req: GridScanRequest,
-  center: LatLng
+  pin: LatLng
 ): Promise<void> {
   const { db, dfs } = deps;
   const isTeleport = req.grid_size === 1;
   const points = isTeleport
-    ? [center]
-    : gridPoints(
-        { lat: business.lat as number, lng: business.lng as number },
-        req.grid_size,
-        req.radius_m
-      );
+    ? [pin]
+    : gridPoints(pin, req.grid_size, req.radius_m);
 
   await db.from("grid_scans").update({ status: "running" }).eq("id", scanId);
 
@@ -184,72 +163,45 @@ async function runScan(
     r.failed ? null : extractRank(r.items, target)
   );
 
-  // Persist pins (TB-005).
+  // Persist pins (TB-005) + the per-point pack (top_ranks, contract lock).
   const pinRows = perPoint.map((r, i) => ({
     scan_id: scanId,
     lat: r.point.lat,
     lng: r.point.lng,
     rank: ranks[i],
+    top_ranks: r.failed ? null : toRankEntries(r.items, target, 20),
   }));
   const del = await db.from("grid_points").delete().eq("scan_id", scanId);
   if (del.error) throw new Error(`grid points reset failed: ${del.error.message}`);
   const ins = await db.from("grid_points").insert(pinRows);
-  if (ins.error) throw new Error(`grid points insert failed: ${ins.error.message}`);
-
-  const results: ScanResults = {
-    points_detail: perPoint.map((r, i) => ({
-      lat: r.point.lat,
-      lng: r.point.lng,
-      rank: ranks[i],
-      distance_km:
-        business.lat !== null && business.lng !== null
-          ? roundKm(haversineKm(business.lat, business.lng, r.point.lat, r.point.lng))
-          : 0,
-      direction:
-        business.lat !== null && business.lng !== null
-          ? directionOf({ lat: business.lat, lng: business.lng }, r.point)
-          : "center",
-      top5: toRankEntries(r.items, target, 5),
-    })),
-    ownership: buildOwnership(perPoint, {
-      ...target,
-      lat: business.lat,
-      lng: business.lng,
-    }),
-    weak_direction: weakDirection(center, pinRows),
-    in_top3_pct: inTop3Pct(ranks),
-    teleport_top10: isTeleport ? toRankEntries(perPoint[0].items, target, 10) : null,
-  };
-  resultsRegistry.set(scanId, results);
+  if (ins.error) {
+    // Migration 20260713000001 not applied yet — persist without the packs
+    // (pin popovers then show rank + distance only, per the contract note).
+    const bare = pinRows.map(({ top_ranks: _drop, ...row }) => row);
+    const retry = await db.from("grid_points").insert(bare);
+    if (retry.error) {
+      throw new Error(`grid points insert failed: ${retry.error.message}`);
+    }
+  }
 
   const unitCost = isTeleport
     ? ESTIMATE_USD.teleport
     : ESTIMATE_USD.grid_point_standard;
-  const scanPatch = {
+  const patch = {
     status: allFailed ? "failed" : perPoint.some((r) => r.failed) ? "partial" : "done",
     avg_rank: avgRank(ranks),
-    // Estimate-based; the ledger (TB-010) holds the settled vendor costs.
+    // Estimate-based; the ledger (TB-010) holds the settled vendor actuals.
     cost_usd: Math.round(points.length * unitCost * 10_000) / 10_000,
   };
-
-  // Try with the proposed jsonb column; fall back gracefully until the
-  // migration lands (results then live in the in-process registry only).
-  const withResults = await db
-    .from("grid_scans")
-    .update({ ...scanPatch, results })
-    .eq("id", scanId);
-  if (withResults.error) {
-    const base = await db.from("grid_scans").update(scanPatch).eq("id", scanId);
-    if (base.error) throw new Error(`grid scan update failed: ${base.error.message}`);
-  }
+  const upd = await db.from("grid_scans").update(patch).eq("id", scanId);
+  if (upd.error) throw new Error(`grid scan update failed: ${upd.error.message}`);
 }
 
-// ---------- EP-004 reads ----------
+// ---------- EP-004 reads (everything derived from TB-004/005 + business) ----------
 
-async function loadScan(
-  db: SupabaseClient,
-  scanId: string
-): Promise<{ scan: GridScan; points: GridPoint[]; results: ScanResults | null } | null> {
+type StoredPoint = GridPoint & { top_ranks?: RankEntry[] | null };
+
+async function loadScan(db: SupabaseClient, scanId: string) {
   const { data, error } = await db
     .from("grid_scans")
     .select()
@@ -257,18 +209,38 @@ async function loadScan(
     .maybeSingle();
   if (error) throw new Error(`grid scan read failed: ${error.message}`);
   if (!data) return null;
-  const { results: storedResults, ...scan } = data as GridScan & {
-    results?: ScanResults | null;
-  };
-  const { data: pointRows, error: pErr } = await db
-    .from("grid_points")
-    .select()
-    .eq("scan_id", scanId);
+  const scan = data as GridScan;
+  const [{ data: pointRows, error: pErr }, { data: businessRow, error: bErr }] =
+    await Promise.all([
+      db.from("grid_points").select().eq("scan_id", scanId),
+      db.from("businesses").select().eq("id", scan.business_id).maybeSingle(),
+    ]);
   if (pErr) throw new Error(`grid points read failed: ${pErr.message}`);
+  if (bErr) throw new Error(`business read failed: ${bErr.message}`);
   return {
-    scan: scan as GridScan,
-    points: (pointRows ?? []) as GridPoint[],
-    results: storedResults ?? resultsRegistry.get(scanId) ?? null,
+    scan,
+    points: (pointRows ?? []) as StoredPoint[],
+    business: (businessRow as Business) ?? null,
+  };
+}
+
+function centerOf(business: Business | null): { lat: number; lng: number } {
+  return {
+    lat: business?.lat ?? 0,
+    lng: business?.lng ?? 0,
+  };
+}
+
+function toDetail(
+  p: StoredPoint,
+  center: { lat: number; lng: number }
+): GridPointDetail {
+  const { top_ranks, ...point } = p;
+  return {
+    ...point,
+    distance_km: roundKm(haversineKm(center.lat, center.lng, p.lat, p.lng)),
+    direction: directionOf(center, p),
+    top5: (top_ranks ?? []).slice(0, 5),
   };
 }
 
@@ -278,18 +250,19 @@ export async function getGridResult(
 ): Promise<GridScanResult | TeleportResult | null> {
   const loaded = await loadScan(db, scanId);
   if (!loaded) return null;
-  const { scan, points, results } = loaded;
+  const { scan, points, business } = loaded;
+  const center = centerOf(business);
 
   if (scan.grid_size === 1) {
-    const point = points[0] ?? null;
-    const detail = results?.points_detail[0];
+    const p = points[0];
     const teleport: TeleportResult = {
       scan,
-      point:
-        point ??
-        ({ id: 0, scan_id: scan.id, lat: 0, lng: 0, rank: null } as GridPoint),
-      distance_km: detail?.distance_km ?? 0,
-      top10: results?.teleport_top10 ?? [],
+      center,
+      point: p
+        ? { id: p.id, scan_id: p.scan_id, lat: p.lat, lng: p.lng, rank: p.rank }
+        : ({ id: 0, scan_id: scan.id, lat: 0, lng: 0, rank: null } as GridPoint),
+      distance_km: p ? roundKm(haversineKm(center.lat, center.lng, p.lat, p.lng)) : 0,
+      top10: (p?.top_ranks ?? []).slice(0, 10),
     };
     return teleport;
   }
@@ -297,38 +270,30 @@ export async function getGridResult(
   const ranks = points.map((p) => p.rank);
   return {
     scan,
-    points,
-    in_top3_pct: results?.in_top3_pct ?? inTop3Pct(ranks),
-    weak_direction:
-      results?.weak_direction ??
-      (points.length > 0
-        ? weakDirection(
-            {
-              lat: points.reduce((s, p) => s + p.lat, 0) / points.length,
-              lng: points.reduce((s, p) => s + p.lng, 0) / points.length,
-            },
-            points
-          )
-        : null),
-    ownership: results?.ownership ?? [],
+    center,
+    points: points.map((p) => toDetail(p, center)),
+    in_top3_pct: inTop3Pct(ranks),
+    weak_direction: weakDirection(center, points),
+    ownership: buildOwnership(points.map((p) => p.top_ranks ?? [])),
+    // Volumes need a guarded keywords_data call with its own ₹ preview —
+    // wired after the live smoke calibrates §2.6 (HANDOFF 15:45). Null is
+    // contract-legal; P5 hides the card.
+    demand_hint: null,
   } satisfies GridScanResult;
 }
 
-/** Pin popover payload (P5) — from the stored per-point detail. */
-export async function getPointDetail(
+/** GET /api/grid?businessId= — P5 history card (₹0 DB read). */
+export async function listGridScans(
   db: SupabaseClient,
-  scanId: string,
-  pointId: number
-): Promise<GridPointDetail | null> {
-  const loaded = await loadScan(db, scanId);
-  if (!loaded?.results) return null;
-  const point = loaded.points.find((p) => p.id === pointId);
-  if (!point) return null;
-  const detail = loaded.results.points_detail.find(
-    (d) => Math.abs(d.lat - point.lat) < 1e-9 && Math.abs(d.lng - point.lng) < 1e-9
-  );
-  if (!detail) return null;
-  return { ...point, ...detail };
+  businessId: string
+): Promise<GridScan[]> {
+  const { data, error } = await db
+    .from("grid_scans")
+    .select()
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`grid scans list failed: ${error.message}`);
+  return (data ?? []) as GridScan[];
 }
 
 // ---------- compare (MS2-T06/T07) ----------

@@ -3,7 +3,7 @@ import { gridEstimateUsd, toInr } from "@/server/costs";
 import { makeSpendGuard } from "@/server/spend";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { createServiceClient } from "@/lib/supabase/server";
-import { startGridScan } from "@/server/grid";
+import { listGridScans, startGridScan } from "@/server/grid";
 import { err, errFrom, ok, readJson } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +49,19 @@ function parseBody(raw: unknown): GridScanRequest | string {
     lat,
     lng,
   };
+}
+
+/** GET /api/grid?businessId= → GridScan[] newest-first (P5 history, ₹0). */
+export async function GET(req: Request) {
+  const businessId = new URL(req.url).searchParams.get("businessId") ?? "";
+  if (!UUID_RE.test(businessId)) {
+    return err("VALIDATION_ERROR", "businessId (UUID) query parameter is required");
+  }
+  try {
+    return ok(await listGridScans(createServiceClient(), businessId));
+  } catch (e) {
+    return errFrom(e);
+  }
 }
 
 /** EP-003 — POST /api/grid: `{preview:true}` → CostPreview; else queue the

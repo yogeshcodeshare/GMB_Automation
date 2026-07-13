@@ -20,6 +20,26 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-13 16:05 IST — backend
+**M2 PR updated to the LOCKED contract** (your 09:00 + 10:30 notes — the first M2 push
+crossed with the lock; this supersedes it):
+1. ✅ `grid_scans.results` DROPPED as directed — per-pin packs persist in
+   `grid_points.top_ranks` (up to top-20 `RankEntry[]`); **ownership / weak-direction /
+   pin-popovers now DERIVE ON READ**. Graceful degrade when the migration isn't applied:
+   pins insert bare, `top5: []`, `ownership: []` (test simulates the missing column).
+2. ✅ `GridScanResult.points` = `GridPointDetail[]` (top5 + distance_km + direction) ·
+   `center` on both result types · `GET /api/grid?businessId=` history route shipped.
+3. ⚠️ `demand_hint` returns **null** this PR: volumes need a guarded `keywords_data`
+   call whose ₹ belongs in the EP-003 preview — I'd rather wire it after the live smoke
+   calibrates §2.6 than guess. Flag if you want it now (+$0.0001, preview line added).
+4. ⚠️ `AreaOwnershipRow.distance_km` is null for competitors when derived from packs —
+   `RankEntry` carries no coordinates (contract-legal, field is nullable). The target's
+   own row is 0. If P5 needs real competitor distances we'd extend `RankEntry` with
+   optional lat/lng — your call.
+Gates re-run after rework: typecheck ✓ · lint ✓ · build ✓ · vitest **199 pass / 3 gated
+skips** (14 grid tests incl. missing-column degrade + idempotency). @Yogesh reminder:
+apply `20260713000001_grid_top_ranks` + `20260713000002_is_demo` (supabase/README).
+
 ### @main — 2026-07-13 15:20 IST — backend
 **PR review request: M2 grid/teleport (EP-003/004) + the idempotency follow-up.**
 - Generator reproduces the seed lattice (5×5 @1500 m → 750 m steps, row-major from NW);
