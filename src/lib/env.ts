@@ -40,3 +40,8 @@ export function dataForSeoCredentials(): { login: string; password: string } | n
   const password = process.env.DATAFORSEO_PASSWORD;
   return login && password ? { login, password } : null;
 }
+
+/** PageSpeed Insights (free Google API key) — M1.5 website audit. */
+export function psiApiKey(): string | null {
+  return process.env.PSI_API_KEY || null;
+}

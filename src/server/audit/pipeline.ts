@@ -36,10 +36,16 @@ import { finishProgress, initProgress, setStage } from "./progress";
 import {
   insertAudit,
   insertScores,
+  insertWebsiteAudit,
   replacePosts,
   updateAuditSnapshot,
   upsertReviews,
 } from "./repo";
+import {
+  crawlWebsite,
+  psiMobileScore,
+  type CrawlGbpFacts,
+} from "@/server/website";
 
 /** EP-001 — the M1 audit pipeline (MS1-T01..T11). */
 
@@ -263,7 +269,8 @@ async function runStages(
   const { db, dfs } = deps;
   const now = deps.now ?? (() => new Date());
   const reference = now();
-  const warnings: string[] = [];
+  const warnings: string[] = []; // stage failures → status "partial"
+  const notes: string[] = []; // informational findings → detail only
 
   // ---- stage: profile (hard requirement — no profile, no audit) ----
   setStage(auditId, "profile");
@@ -351,20 +358,65 @@ async function runStages(
     setStage(auditId, "website", "competitor discovery unavailable");
   }
 
-  // ---- stage: website (M1.5 crawler lands EP-014; rented-subdomain check
-  // already runs off profile.website in sanity + rubric) ----
-  setStage(auditId, "scoring");
+  // ---- stage: website (M1.5 — SSRF-guarded crawler + free PSI) ----
+  let website: AuditInput["website"] = null;
+  let websiteUnreachable = false;
+  if (req.options.website_audit && profile.website) {
+    try {
+      const gbp: CrawlGbpFacts = {
+        name: profile.name,
+        address: profile.address,
+        phone: profile.phone,
+        city: profile.city,
+        categories: [
+          ...(profile.categories.primary ? [profile.categories.primary] : []),
+          ...profile.categories.secondary,
+        ],
+      };
+      const [outcome, psi] = await Promise.all([
+        crawlWebsite(profile.website, gbp),
+        psiMobileScore(profile.website),
+      ]);
+      if (outcome.reachable && outcome.findings) {
+        website = outcome.findings;
+        await insertWebsiteAudit(db, businessId, {
+          psi_score: psi,
+          title_ok: website.title.has_category && website.title.has_city,
+          meta_ok: website.meta.has_category && website.meta.has_locality,
+          h1_ok: outcome.h1_ok,
+          schema_ok: outcome.schema_ok,
+          nap_match: website.nap.every((r) => r.match),
+          city_kw: website.local_keywords.some((k) => k.found),
+        });
+        setStage(auditId, "scoring", `website crawled (PSI ${psi ?? "n/a"})`);
+      } else {
+        // A dead site is a FINDING (renormalised row + note), not a pipeline
+        // failure — the audit still completes as "done".
+        websiteUnreachable = true;
+        notes.push(`website: ${outcome.error ?? "unreachable"} — renormalised`);
+        setStage(auditId, "scoring", "website unreachable — renormalised");
+      }
+    } catch (e) {
+      websiteUnreachable = true;
+      warnings.push(`website: ${e instanceof Error ? e.message : "failed"}`);
+      setStage(auditId, "scoring", "website audit failed — renormalised");
+    }
+  } else {
+    setStage(auditId, "scoring");
+  }
 
   // ---- stage: scoring + persistence ----
   const input: AuditInput = {
     profile,
     reviews,
     posts,
-    website: null,
+    website,
+    website_unreachable: websiteUnreachable,
     competitors,
   };
   const status = warnings.length > 0 ? "partial" : "done";
-  const progress = finishProgress(auditId, status, warnings.join(" · ") || undefined);
+  const detail = [...warnings, ...notes].join(" · ") || undefined;
+  const progress = finishProgress(auditId, status, detail);
   const snapshot = buildSnapshot(input, {
     source: "dataforseo",
     auditedAt: startedAt,

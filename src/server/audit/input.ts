@@ -129,6 +129,9 @@ export interface AuditInput {
   reviews: NormalizedReviews | null; // null = review pull failed/skipped
   posts: NormalizedPosts | null; // null = post audit not run
   website: WebsiteFindings | null; // null = no website audit (renormalise, M1.5)
+  /** M1.5: the linked site did not answer the crawler — §2.5 renormalises the
+   * website section away instead of punishing an unverifiable row. */
+  website_unreachable?: boolean;
   competitors: CompetitorSnapshot[];
 }
 

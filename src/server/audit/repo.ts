@@ -140,6 +140,29 @@ export async function replacePosts(
   if (error) fail("posts insert", error.message);
 }
 
+/** TB-013 — one row per website check. */
+export async function insertWebsiteAudit(
+  db: SupabaseClient,
+  businessId: string,
+  fields: {
+    psi_score: number | null;
+    title_ok: boolean | null;
+    meta_ok: boolean | null;
+    h1_ok: boolean | null;
+    schema_ok: boolean | null;
+    nap_match: boolean | null;
+    city_kw: boolean | null;
+  }
+): Promise<number> {
+  const { data, error } = await db
+    .from("website_audits")
+    .insert({ business_id: businessId, ...fields })
+    .select("id")
+    .single();
+  if (error) fail("website audit insert", error.message);
+  return Number(data.id);
+}
+
 // ---------- reads ----------
 
 export async function getBusiness(

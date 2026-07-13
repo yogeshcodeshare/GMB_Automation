@@ -230,13 +230,22 @@ function scorePosts(input: AuditInput): RowResult {
 
 // ---------- website (10) ----------
 // present 4 · title ok 2 · meta ok 2 · owned domain (not rented) 2.
+// No site / unreachable site → the section is SKIPPED and the total
+// renormalises to a /90 basis (§2.5) — handled in scoreAudit.
 function scoreWebsite(input: AuditInput): RowResult {
   const url = input.profile.website;
   if (!url) {
     return {
       points: 0,
-      status: "fail",
-      reason: "No website linked (score renormalises in M1.5 when truly siteless)",
+      status: "warn",
+      reason: "No website linked — section skipped, score renormalised (/90 basis)",
+    };
+  }
+  if (input.website_unreachable) {
+    return {
+      points: 0,
+      status: "warn",
+      reason: "Website did not respond — section skipped, score renormalised (/90 basis)",
     };
   }
   const w = input.website;
@@ -318,7 +327,15 @@ export function scoreAudit(input: AuditInput): ScoreResult {
   ];
 
   const by = (key: RubricKey) => rubric.find((r) => r.key === key)!.points;
-  const total = rubric.reduce((sum, r) => sum + r.points, 0);
+  const rawTotal = rubric.reduce((sum, r) => sum + r.points, 0);
+
+  // §2.5 renormalisation: siteless/unreachable → drop the 10-point website
+  // section from the basis so the business isn't punished for a row we
+  // cannot verify. Row points stay as stored (website = 0).
+  const skipWebsite = !input.profile.website || input.website_unreachable === true;
+  const total = skipWebsite
+    ? Math.min(100, Math.round((rawTotal / 90) * 100))
+    : rawTotal;
 
   return {
     scores: {

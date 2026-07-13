@@ -1,4 +1,5 @@
 import type { ContentDepthBand, HeadingNode, NapMatchRow, NapField } from "@/types";
+import { buildHeadingTree } from "@/server/audit/headings";
 import { findLine, parseTableAt, sectionLines } from "./md";
 
 /** Parsed fixtures/WebsiteAudit.md (GMB Everywhere "Website Audit" export).
@@ -51,37 +52,16 @@ function parseHeadings(lines: string[]): {
   headings: HeadingNode[];
   skips: string[];
 } {
-  const roots: HeadingNode[] = [];
-  const stack: HeadingNode[] = [];
-  const skips: string[] = [];
+  const sequence: Array<{ level: HeadingNode["level"]; text: string }> = [];
   for (const raw of lines) {
     const m = /^\s*-\s*\*\*H([1-6]):\*\*\s*(.+)$/.exec(raw);
     if (!m) continue;
-    const level = Number(m[1]) as HeadingNode["level"];
-    const node: HeadingNode = {
-      level,
+    sequence.push({
+      level: Number(m[1]) as HeadingNode["level"],
       text: m[2].trim(),
-      skip_flag: false,
-      children: [],
-    };
-    while (stack.length > 0 && stack[stack.length - 1].level >= level) {
-      stack.pop();
-    }
-    const parent = stack[stack.length - 1];
-    if (parent) {
-      node.skip_flag = level > parent.level + 1;
-      if (node.skip_flag) {
-        const skip = `H${parent.level}→H${level}`;
-        if (!skips.includes(skip)) skips.push(skip);
-      }
-      parent.children.push(node);
-    } else {
-      node.skip_flag = level > 1 && roots.length === 0;
-      roots.push(node);
-    }
-    stack.push(node);
+    });
   }
-  return { headings: roots, skips };
+  return buildHeadingTree(sequence);
 }
 
 export function parseWebsiteAudit(md: string): ParsedWebsiteAudit {
