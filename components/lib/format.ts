@@ -33,6 +33,29 @@ export function shortDate(iso: string): string {
   });
 }
 
+/**
+ * Google-style relative date ("a week ago", "2 months ago", "a year ago").
+ * Dates >1yr are approximated by Google — the caller labels that separately.
+ */
+export function relativeDate(iso: string, now: Date = new Date()): string {
+  const days = Math.max(
+    0,
+    Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000),
+  );
+  if (days < 1) return "today";
+  if (days < 7) return days === 1 ? "a day ago" : `${days} days ago`;
+  if (days < 30) {
+    const w = Math.floor(days / 7);
+    return w === 1 ? "a week ago" : `${w} weeks ago`;
+  }
+  if (days < 365) {
+    const m = Math.floor(days / 30);
+    return m === 1 ? "a month ago" : `${m} months ago`;
+  }
+  const y = Math.floor(days / 365);
+  return y === 1 ? "a year ago" : `${y} years ago`;
+}
+
 /** "Saturday, 11 July 2026" — top bar. */
 export function longDate(d: Date): string {
   return d.toLocaleDateString("en-IN", {
