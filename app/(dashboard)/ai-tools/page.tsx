@@ -172,15 +172,15 @@ export default function AiToolsPage() {
     // UI offers "Festive" (prototype); contract Tone is warm|professional.
     const request: AiGenerateRequest =
       tab === "post"
-        ? { tool: "post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", topic, cta: cta === "Call now" ? "call_now" : cta === "Book" ? "book" : cta === "Learn more" ? "learn_more" : "offer" }
+        ? { tool: "post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", topic, cta: cta === "Call now" ? "call_now" : cta === "Book" ? "book" : cta === "Learn more" ? "learn_more" : "offer" }
         : tab === "reply"
-          ? { tool: "reply", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", review_id: picked.review_id, length: len === "Short" ? "short" : "standard" }
+          ? { tool: "reply", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", review_id: picked.review_id, length: len === "Short" ? "short" : "standard" }
           : tab === "desc"
-            ? { tool: "description", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", current_description: descriptionBeforeMock, include_keywords: descriptionKeywordsMock.filter((_, i) => kwSel[i]) }
+            ? { tool: "description", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", current_description: descriptionBeforeMock, include_keywords: descriptionKeywordsMock.filter((_, i) => kwSel[i]) }
             : tab === "qa"
-              ? { tool: "qa", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", question: question || undefined, suggest_five: !question }
+              ? { tool: "qa", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", question: question || undefined, suggest_five: !question }
               : tab === "fb"
-                ? { tool: "fb_post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", topic, emoji_level: emoji === "None" ? "none" : emoji === "Some" ? "some" : "festive", include_gbp_link: gbpLink === "Yes" }
+                ? { tool: "fb_post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", topic, emoji_level: emoji === "None" ? "none" : emoji === "Some" ? "some" : "festive", include_gbp_link: gbpLink === "Yes" }
                 : { tool: "festival", business_id: toolBiz.id, lang, festival, template: (tplIdx + 1) as 1 | 2 | 3, offer_line: offer };
     setLoading(true);
     void (async () => {
