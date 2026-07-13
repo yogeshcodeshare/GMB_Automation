@@ -57,9 +57,9 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-018 | `POST /api/review-request` | `{ business_id; customer_phone }` | `ReviewRequest` | M9 |
 | EP-019 | `POST /api/service-report/:businessId` | `{ month: string }` | `{ pdf_path; sent: boolean }` | M9 |
 | EP-020 | `POST /api/bulk/festival` | `{ festival: string }` | `Array<{ business_id; result: "published" \| "copied_manual" \| "failed" }>` | M9 |
-| EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` | M6 |
-| — | `GET /api/sprint/prereqs?businessId=` | — | `SprintPrereqs` (US-024 gate) | M6 |
-| EP-022 | `POST /api/sprint/:id/report` | `{ send_whatsapp?: boolean }` | `{ pdf_path; sent: boolean }` | M6 |
+| EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` · `GET /api/sprint?businessId=` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` (GET → `SprintDetail \| null`) | M6 |
+| — | `GET /api/sprint/prereqs?businessId=` | — | `SprintPrereqs` (US-024 gate — 5 checks + `eligible` + `active_sprint_id`) | M6 |
+| EP-022 | `POST /api/sprint/:id/report` | `SprintReportRequest` | `SprintReportResponse` (partial when no after-audit) | M6 |
 | — | `GET /api/businesses/resolve?name=&city=` | — | `BusinessCandidate[]` (P2 picker; one guarded serp/maps call ~$0.0006; cost preview via `?preview=1`) | M1 |
 | — | `GET /api/dashboard/stats` | — | `DashboardStats` (P1 KPI strip; derived from existing tables, ₹0) | M1 |
 | — | `GET /api/businesses` · `GET /api/businesses/:id` | — | `BusinessListItem[]` · `Business` | M1 |
@@ -70,6 +70,38 @@ All type names below live in `src/types/` (import from `@/types`).
 
 Unnumbered rows are contract additions the pages in §2.7b require; MAIN agent owns their
 numbering if the PM assigns IDs later.
+
+### P12 Optimization Sprint — LOCKED invariants (Day 6; types in `@/types` `sprint.ts`)
+
+Manual mode this sprint (ADR-010): **zero GBP API writes** — "apply a fix" = copy
+`suggested_value`/`copy_text` → open `editor_url` (an allowlisted Google-editor UI host,
+opened in the founder's browser, **never fetched server-side, never carries a token**) →
+edit by hand → log `change_before`/`change_after`. Enforced by contract + these rules:
+
+1. **US-024 gate is server-side.** `POST /api/sprint` re-runs all 5 `SprintPrereqs` checks
+   (client+plan · owner contact · connection oauth\|manager · a **scored** audit ≤7d ·
+   no active sprint) and rejects with `FORBIDDEN` (gate) / `CONFLICT` (already active).
+   The `GET /api/sprint/prereqs` result is advisory only — never trusted for creation.
+2. **Approve-before-publish (#4).** AI-prefilled `source='audit'` tasks persist
+   `approved=false`. The copy control, `editor_url`, and the `task_status='done'`
+   transition are **gated on `approved=true`**; `done` also requires a non-empty
+   `change_after`. `source='manual'` tasks need no approval. `add_custom_task` cannot set
+   `source='audit'` or supply `suggested_value`/`ai_output_id` from the client.
+3. **Baseline is immutable (TB-017, #3).** Captured at create; a DB trigger (migration
+   `20260717000001`) rejects any change to `baseline_*` once set and freezes the row once
+   `status='complete'`. `SprintPatchRequest` carries no baseline/after fields; the route
+   validates against the strict shape (unknown keys → `VALIDATION_ERROR`).
+4. **No paid calls (#7).** `POST`/`PATCH`/report read existing TB-002/003/004 rows only.
+   `complete_sprint` links `after_*` from the latest **already-existing** scored audit/grid
+   and **never** triggers EP-001 or a grid scan; if none exists, `after_*=null`.
+5. **EP-022 degrades gracefully** in the CR-1-OFF world: with no after-audit, the report is
+   **partial** — `final_score`/`rubric_deltas`/`grid` empty, `field_changes` + `work_log`
+   still rendered. WhatsApp send stays behind the wa flag (`wa_status` explains `sent=false`;
+   the PDF is always produced). `storage_url` is the user-facing link.
+
+**Requires client migration `20260717000001_sprint_p12_hardening.sql`** (4 `fix_tasks`
+columns + baseline NOT NULL + one-active index + immutability trigger) before the backend
+endpoints run live. UAT tonight uses seed data (defaults apply) — not blocked.
 
 ## Error examples
 

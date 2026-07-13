@@ -20,6 +20,66 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-17 10:30 IST — main
+**CONTRACT-FIRST: EP-021/EP-022 P12 Optimization Sprint contract is LOCKED — build against
+it, do not improvise.** Types in `@/types` (`src/types/sprint.ts`); invariants in
+`API_CONTRACT.md` → "P12 Optimization Sprint — LOCKED invariants". Arbitrated from a
+research→design→3-lens adversarial-critique pass; the critique caught real holes (below).
+
+**Endpoints:** `POST /api/sprint` (create) · `PATCH /api/sprint/:id` (task state only) ·
+**`GET /api/sprint?businessId=` → `SprintDetail | null`** (NEW — the page can't render
+without a read) · `GET /api/sprint/prereqs?businessId=` → `SprintPrereqs` ·
+`POST /api/sprint/:id/report` → `SprintReportResponse`.
+
+**Arbitration deltas from the skeleton types (what changed):**
+- `SprintPrereqs` → per-check `{ok, reason}` + `eligible` + a **5th `no_active_sprint`**
+  check + `active_sprint_id` (start-vs-resume) + `fresh_audit_id`/`latest_grid_id`. Prereq
+  ④ = a **scored** audit ≤7d (has an `audit_scores` row) — not just any audit row.
+- `SprintTask` = `FixTask` + server-computed `group`, `rubric`, `current_value`,
+  `editor_url`, `editor_hint`, `estimate_minutes`, `rubric_points` (all computed, not stored).
+- `SprintDetail` adds `baseline` + `groups` (6 sources) + `prereqs`; EP-022 gets
+  `SprintBeforeAfter` with **partial-report** semantics (no after-audit → score/deltas/grid
+  empty, `field_changes`+`work_log` still render).
+- **New `fix_tasks` columns** (persisted): `approved`, `suggested_value`, `copy_text`,
+  `ai_output_id`. Per-task `notify` (US-022) is **DEFERRED to Week-2** (no delivery path in
+  a manual, wa-off sprint) — don't build the toggle.
+- Custom task = `{ title, group }` (group picker, not raw rubric_key).
+
+**@backend — M6 build DoD (I will gate on these):**
+1. `POST /api/sprint` re-runs ALL 5 US-024 checks server-side; `FORBIDDEN` on gate fail,
+   `CONFLICT` when a sprint is already active. Never trust the client gate.
+2. **Approve-before-publish:** reject `task_status='done'` for `source='audit'` unless
+   `approved=true` AND `change_after` non-empty. `add_custom_task` can't set `source='audit'`
+   or client-supply `suggested_value`/`ai_output_id`. AI prefills → `ai_outputs(approved=false)`.
+3. **Baseline immutability:** rely on the DB trigger (migration `20260717000001`) AND validate
+   PATCH against the strict `SprintPatchRequest` (reject unknown keys → `VALIDATION_ERROR`);
+   build the UPDATE from a fixed allow-list that never includes `baseline_*`/`after_*`. Write
+   a test: a raw PATCH carrying `baseline_audit_id` must fail.
+4. **Zero GBP writes / zero paid calls:** the sprint route must NOT import gbp.service write
+   fns; `complete_sprint` links `after_*` from existing scans only — never EP-001/grid.
+5. EP-022: PDF always produced; WA leg behind the wa flag (`wa_status`); partial when no after.
+6. `editor_url` derivation: allowlisted Google-editor host, never server-fetched, no token —
+   add a unit assertion.
+
+**@frontend — P12 UI build notes:** load state via `GET /api/sprint` (branch start-vs-resume
+on `active_sprint_id`); render prereq blocked-states from the 5 `{ok,reason}` checks; tasks in
+6 catalog-ordered groups; copy uses `copy_text ?? suggested_value`; show `current_value →
+suggested_value`; approval tap unlocks copy/editor/done; report card degrades to
+field-changes+work-log when partial; download via `storage_url`.
+
+**🚑 @Yogesh (client) — apply migration `20260717000001_sprint_p12_hardening.sql`** (Supabase
+SQL editor): 4 `fix_tasks` columns + `baseline_audit_id` NOT NULL + one-active unique index +
+the immutability trigger. Idempotent, no RLS change, no paid path. Needed before the backend
+sprint endpoints run live; **UAT tonight uses seed data (defaults apply) — not blocked.**
+
+**MERGE GATES for Day-6 scope (what I enforce before merging any PR):**
+- **M6 sprint:** server-side prereq gate test; immutable-baseline test (raw PATCH fails);
+  AI prefills persist `approved=false`; **grep the diff for any gbp.service write / DataForSEO
+  call in the sprint flow → auto-reject**; manual-mode copy+editor only.
+- **P11 Settings:** widened PATCH — spend-cap edit round-trips (200 + survives reload); the
+  spend-ledger view reads REAL `spend_ledger` rows (not a mock).
+- **P9 Client Ops:** READ views only this sprint — reject any invented write endpoint.
+
 ### @all — 2026-07-17 09:10 IST — main
 **Authed live-read walk DONE — but the two remaining flips are BLOCKED, not deferred.
 Findings + evidence in `docs/agents/DAY6_INTEGRATION.md`. Do NOT flip `/api/settings` or
