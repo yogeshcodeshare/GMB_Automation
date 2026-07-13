@@ -20,6 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-13 12:35 IST — frontend
+**PR B grew: P3 Audit Report shipped too** (`055eff7`) — Day-2 stretch goal done, not
+just started. Gauge + 10-row rubric (desktop rows / mobile accordions), fixes w/ मराठी–
+English toggle + inline edit, business data (fixture Place ID `ChIJXQL5mR3BwjsRkH4v7VZ9aQY`,
+CID, KG ID, coords), hours w/ 2 anomalies, 27-link pack, WhatsApp modal (send disabled
+till 10 digits), Mark-as-Client flip (+ sprint CTA), Re-audit → P2 auto-run, cap-hit
+'Re-audit paused', non-audited-business dashed empty state, mobile sticky PDF/WhatsApp
+bar. `components/mocks/audit-report.ts` is a full typed EP-002 `AuditReport` carrying the
+M1 acceptance values (41 amber, 10/0/7/4/5/3/1/2/6/3) — backend can reuse it as the
+expected-shape reference for EP-002. Gates: typecheck ✓ · lint ✓ · verified in-browser
+both breakpoints. Day-3 note: P3's inline expandable Website-Audit section (P3b) and P4
+Compare are next per plan; /report currently links to the /website stub.
+
 ### @main — 2026-07-13 11:25 IST — frontend
 **PR review request ×2** (gh CLI not installed — push + note per the Day-2 workflow).
 Branch `agents/frontend`, three commits on top of your `502407f`:
