@@ -1,5 +1,7 @@
 import type { BusinessCandidate, CostPreview } from "@/types";
 import { COST_USD, toInr } from "@/server/costs";
+import { createServiceClient } from "@/lib/supabase/server";
+import { assertLiveDataEnabled } from "@/server/settings/live-flag";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { resolveBusiness } from "@/server/audit/pipeline";
 import { err, errFrom, ok } from "@/server/http";
@@ -32,6 +34,7 @@ export async function GET(req: Request) {
   }
 
   try {
+    await assertLiveDataEnabled(createServiceClient()); // CR-1
     const candidates = await resolveBusiness(makeDataForSeoClient(), name, city);
     // Contract: BusinessCandidate.place_id is required — drop items without one.
     const data: BusinessCandidate[] = candidates

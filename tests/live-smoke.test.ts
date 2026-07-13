@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { dataForSeoCredentials } from "@/lib/env";
 import { DataForSeoClient } from "@/server/dataforseo";
+import { makeLiveGate, readLiveDataFlag } from "@/server/settings/live-flag";
 import { SpendGuard, SupabaseSpendStore } from "@/server/spend";
 import { startAudit } from "@/server/audit/pipeline";
 import { getAuditWithScores, getBusiness } from "@/server/audit/repo";
@@ -24,8 +25,29 @@ describe.skipIf(!enabled)("LIVE smoke — मनोवेध हिप्नो�
     const db = createClient(url as string, secret as string, {
       auth: { persistSession: false },
     });
+
+    // CR-1: the smoke honours the live-data master switch like every caller.
+    if (!(await readLiveDataFlag(db))) {
+      console.warn(
+        "[smoke] settings.dataforseo_live_enabled is FALSE — verifying the gate blocks instead of auditing"
+      );
+      const gated = new DataForSeoClient({
+        guard: new SpendGuard(new SupabaseSpendStore(db)),
+        credentials: creds,
+        liveGate: makeLiveGate(db),
+      });
+      await expect(gated.myBusinessInfo({ keyword: "x" })).rejects.toThrow(
+        /Live data is off/
+      );
+      return;
+    }
+
     const guard = new SpendGuard(new SupabaseSpendStore(db));
-    const dfs = new DataForSeoClient({ guard, credentials: creds });
+    const dfs = new DataForSeoClient({
+      guard,
+      credentials: creds,
+      liveGate: makeLiveGate(db),
+    });
 
     const before = await guard.getStatus();
     console.log(

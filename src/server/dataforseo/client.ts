@@ -1,6 +1,8 @@
 import type { CostPreview } from "@/types";
 import { COST_USD, toInr } from "@/server/costs";
 import { makeSpendGuard, type SpendGuard } from "@/server/spend";
+import { makeLiveGate } from "@/server/settings/live-flag";
+import { createServiceClient } from "@/lib/supabase/server";
 import { dataForSeoCredentials } from "@/lib/env";
 import type {
   DfsEnvelope,
@@ -55,6 +57,10 @@ export class DfsTimeoutError extends Error {
 export interface DfsClientDeps {
   guard: SpendGuard;
   credentials: { login: string; password: string } | null;
+  /** CR-1 live-data master switch: awaited at EVERY paid entry BEFORE the
+   * spend reserve and before any network I/O. Throws LiveDataDisabledError
+   * while settings.dataforseo_live_enabled is false (the default). */
+  liveGate?: () => Promise<void>;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
   maxPollMs?: number;
@@ -193,6 +199,7 @@ export class DataForSeoClient {
     estimateUsd: number,
     body: unknown
   ): Promise<R[]> {
+    if (this.deps.liveGate) await this.deps.liveGate(); // CR-1: before everything
     this.authHeader(); // fail fast on missing creds BEFORE reserving spend
     return this.deps.guard.guarded(path, estimateUsd, async () => {
       const envelope = await this.request<R>(path, body);
@@ -215,6 +222,7 @@ export class DataForSeoClient {
     estimateUsd: number,
     body: unknown
   ): Promise<R[]> {
+    if (this.deps.liveGate) await this.deps.liveGate(); // CR-1: before everything
     this.authHeader();
     const posted = await this.deps.guard.guarded(postPath, estimateUsd, async () => {
       // NO transport retry on task_post — a duplicate would double-charge.
@@ -385,10 +393,12 @@ export class DataForSeoClient {
   }
 }
 
-/** Server-side factory wired to live guard + env credentials. */
+/** Server-side factory wired to live guard + env credentials + the CR-1
+ * live-data master switch (default OFF). */
 export function makeDataForSeoClient(): DataForSeoClient {
   return new DataForSeoClient({
     guard: makeSpendGuard(),
     credentials: dataForSeoCredentials(),
+    liveGate: makeLiveGate(createServiceClient()),
   });
 }

@@ -1,5 +1,6 @@
 import type { CostPreview, GridScanRequest, GridSize } from "@/types";
 import { gridEstimateUsd, toInr } from "@/server/costs";
+import { assertLiveDataEnabled } from "@/server/settings/live-flag";
 import { makeSpendGuard } from "@/server/spend";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    await assertLiveDataEnabled(createServiceClient()); // CR-1: clean 503 first
     await makeSpendGuard().assertCanSpend(estimate); // clean 402 up front
     const started = await startGridScan(
       { dfs: makeDataForSeoClient(), db: createServiceClient() },

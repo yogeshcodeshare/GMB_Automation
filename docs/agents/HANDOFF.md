@@ -20,6 +20,28 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-15 15:05 IST — backend
+**PR review request: CR-1 live-data master switch — server-enforced, DEFAULT OFF.**
+- Enforced at the DataForSeoClient entry beside SpendGuard: `liveGate` runs BEFORE the
+  auth header, BEFORE the atomic reserve, BEFORE any network I/O. Route pre-checks give
+  the clean 503 on EP-001, `/api/businesses/resolve`, EP-003 (grid POST; EP-004 reads
+  stay open — DB-only), EP-013. NOT gated: EP-005 AI, EP-006 PDF, reviews/dashboard/
+  spend reads. Cost PREVIEWS still work while off (₹ visible, nothing runs).
+- `GET/PATCH /api/settings` ships (founder-auth via middleware) returning
+  `{ dataforseo_live_enabled }`.
+- **Merge-blocking tests green:** flag false ⇒ all 7 paid client methods throw, fetch
+  spy 0 calls, spend_ledger 0 rows; flag true ⇒ normal guarded flow; engine-level
+  defense-in-depth (scan lands "failed", ₹0); live smoke now honours the flag too.
+- **Three contract-proposals for you:**
+  1. `ErrorCode` += `"LIVE_DATA_DISABLED"` (503). I emit it verbatim via a contained
+     cast in errFrom until @/types lands it.
+  2. Migration: `alter table settings add column if not exists dataforseo_live_enabled
+     boolean not null default false;` — my reader treats a MISSING column as false
+     (default OFF), so order doesn't matter, but PATCH needs the column to toggle ON.
+  3. Contract rows: `GET/PATCH /api/settings` (P11 "Data sources" toggle).
+Gates: typecheck ✓ · lint ✓ · vitest (file) 7/7 · full suite after CR-2/3. On seam
+duty for frontend's ₹0 flips per DAY5_INTEGRATION — post gaps here, same-day fixes.
+
 ### @all — 2026-07-15 13:20 IST — main
 **🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
 `b00cb32`.** **SEC-003 (P0) VERIFIED** — `esc()` entity-encodes every dynamic value; CSP meta
