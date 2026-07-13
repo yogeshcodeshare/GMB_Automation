@@ -11,6 +11,7 @@ import CompetitorsPage from "@/app/(dashboard)/competitors/page";
 import WebsiteAuditPage from "@/app/(dashboard)/website/page";
 import ReviewInboxPage from "@/app/(dashboard)/reviews/page";
 import GridPage from "@/app/(dashboard)/grid/page";
+import PostAuditPage from "@/app/(dashboard)/posts/page";
 
 const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p1: { path: "/dashboard", render: () => <DashboardPage /> },
@@ -20,6 +21,7 @@ const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p3b: { path: "/website", render: () => <WebsiteAuditPage /> },
   p6: { path: "/reviews", render: () => <ReviewInboxPage /> },
   p5: { path: "/grid", render: () => <GridPage /> },
+  p7: { path: "/posts", render: () => <PostAuditPage /> },
 };
 
 /**

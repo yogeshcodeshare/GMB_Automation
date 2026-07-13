@@ -15,6 +15,8 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   "/api/businesses": false,
   "/api/spend/today": false,
   "/api/reviews": false,
+  "/api/posts-audit": false,
+  "/api/ai/generate": false,
 };
 
 function liveKey(path: string): string {
@@ -31,14 +33,17 @@ export function isLive(path: string): boolean {
 }
 
 /**
- * Typed GET over the ApiResponse envelope. Returns null on ANY failure
+ * Typed fetch over the ApiResponse envelope. Returns null on ANY failure
  * (endpoint off, HTTP error, error envelope, network) — callers fall back
  * to their typed mock so screens keep working error-free.
  */
-export async function apiGet<T>(path: string): Promise<T | null> {
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T | null> {
   if (!isLive(path)) return null;
   try {
-    const res = await fetch(path);
+    const res = await fetch(path, init);
     const body = (await res.json()) as ApiResponse<T>;
     if (!body.ok) {
       console.warn(`[api] ${path} → ${body.error.code}: ${body.error.message}`);
@@ -49,4 +54,17 @@ export async function apiGet<T>(path: string): Promise<T | null> {
     console.warn(`[api] ${path} failed — using mock fallback.`, err);
     return null;
   }
+}
+
+export function apiGet<T>(path: string): Promise<T | null> {
+  return apiFetch<T>(path);
+}
+
+/** POST helper (EP-013 posts-audit, EP-005 ai/generate, …). */
+export function apiPost<T>(path: string, body: unknown): Promise<T | null> {
+  return apiFetch<T>(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
