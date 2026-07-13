@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/components/shell/app-state";
-import { auditReportMock } from "@/components/mocks/audit-report";
+import {
+  auditPdfNameMock,
+  auditReportMock,
+} from "@/components/mocks/audit-report";
+import { waRecentContactsMock } from "@/components/mocks/wa-contacts";
 import { FixesCard } from "@/components/report/fixes-card";
 import { RubricCard } from "@/components/report/rubric-card";
 import { BandLabel, ScoreGauge } from "@/components/report/score-gauge";
@@ -17,8 +21,6 @@ import { useToast } from "@/components/ui/toast";
 
 const CAPTION =
   "text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft";
-
-const PDF_NAME = "मनोवेध_GMB_Audit_41.pdf";
 
 /** P3 Audit Report — the sales weapon (Manovedh fixture until Day 5). */
 export default function ReportPage() {
@@ -71,13 +73,17 @@ export default function ReportPage() {
   const snap = report.audit.raw_snapshot as {
     kg_id?: string;
     address?: string;
+    rating?: number;
+    reviews_total?: number;
+    claimed?: boolean;
+    audited_at?: string;
   };
 
   const genPdf = () => {
     setPdfBusy(true);
     setTimeout(() => {
       setPdfBusy(false);
-      toast(`PDF ready — ${PDF_NAME}`);
+      toast(`PDF ready — ${auditPdfNameMock}`);
     }, 1300);
   };
 
@@ -124,10 +130,20 @@ export default function ReportPage() {
               Claimed ✓
             </span>
             <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
-              4.9★ · 30 reviews
+              {snap.rating?.toFixed(1)}★ · {snap.reviews_total} reviews
             </span>
             <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
-              Audited 08 Jul 2026 09:12
+              Audited{" "}
+              {snap.audited_at &&
+                new Date(snap.audited_at).toLocaleString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                  timeZone: "Asia/Kolkata",
+                })}
             </span>
           </div>
         </div>
@@ -301,10 +317,13 @@ export default function ReportPage() {
               </div>
             ))}
           </div>
-          <div className="mt-[10px] rounded-lg bg-band-warn-bg px-[10px] py-2 text-[12px] leading-normal text-band-warn">
-            Two overnight blocks look like entry errors — confirm real hours
-            with the owner.
-          </div>
+          {report.hours.some((h) => h.anomaly) && (
+            <div className="mt-[10px] rounded-lg bg-band-warn-bg px-[10px] py-2 text-[12px] leading-normal text-band-warn">
+              {report.hours.filter((h) => h.anomaly).length} overnight block
+              {report.hours.filter((h) => h.anomaly).length > 1 ? "s" : ""}{" "}
+              look like entry errors — confirm real hours with the owner.
+            </div>
+          )}
         </Card>
       </div>
 
@@ -377,7 +396,8 @@ export default function ReportPage() {
 
       {waOpen && (
         <WaModal
-          pdfName={PDF_NAME}
+          pdfName={auditPdfNameMock}
+          recent={waRecentContactsMock}
           onClose={() => setWaOpen(false)}
           onSend={sendWa}
         />

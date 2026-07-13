@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:rls": "vitest run tests/rls.integration.test.ts",
     "create-founder": "node scripts/create-founder.mjs",
-    "m0:verify": "node scripts/m0-verify.mjs"
+    "m0:verify": "node scripts/m0-verify.mjs",
+    "flush:demo": "node scripts/flush-demo.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

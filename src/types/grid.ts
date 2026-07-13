@@ -32,11 +32,22 @@ export interface RankEntry {
   is_target: boolean;
 }
 
-/** Pin-click popover (P5): rank + top-5 at that point + distance. */
+/** Pin-click popover (P5): rank + top-5 at that point + distance.
+ *  `top5` may be [] for scans run before per-point top-N persistence
+ *  (grid_points.top_ranks) or when the pack was unavailable. */
 export interface GridPointDetail extends GridPoint {
   distance_km: number; // business ↔ pin
   direction: string; // e.g. "SE"
   top5: RankEntry[];
+}
+
+/** Powers the P5 "rank ≠ demand" card (scanned niche term vs a broader term).
+ *  Backend fills volumes via keywords_data when available; any field may be null. */
+export interface DemandHint {
+  scanned_keyword: string;
+  scanned_volume: number | null; // e.g. "hypno clinic" ≈ 20/mo
+  broader_keyword: string | null; // e.g. "mental health clinic karad"
+  broader_volume: number | null; // ≈ 320/mo
 }
 
 /** "Who owns this area" table (P5). */
@@ -52,15 +63,18 @@ export interface AreaOwnershipRow {
 
 export interface GridScanResult {
   scan: GridScan;
-  points: GridPoint[];
+  center: { lat: number; lng: number }; // target/business pin — map draws rings + TARGET here
+  points: GridPointDetail[]; // extends GridPoint; carries per-pin top5 + distance + direction
   in_top3_pct: number;
   weak_direction: string | null; // e.g. "south-east (Malkapur side)"
   ownership: AreaOwnershipRow[];
+  demand_hint: DemandHint | null; // rank ≠ demand card (null if no volume data)
 }
 
 /** Teleport (grid_size 1): pin + distance + full top-10. */
 export interface TeleportResult {
   scan: GridScan;
+  center: { lat: number; lng: number }; // business pin (for the "distance from pin" line)
   point: GridPoint;
   distance_km: number;
   top10: RankEntry[];

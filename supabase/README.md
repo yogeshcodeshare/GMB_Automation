@@ -7,7 +7,10 @@ DDL, so the two migrations are applied once by hand (2 minutes):
 2. Paste the full contents of `migrations/20260712000001_init_schema.sql` → **Run**.
 3. Paste the full contents of `migrations/20260712000002_seed.sql` → **Run**.
 4. Paste the full contents of `migrations/20260712000003_spend_functions.sql` → **Run**.
-5. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
+5. **Day-3 additions** — paste `migrations/20260713000001_grid_top_ranks.sql` (per-point
+   top-N for the P5 popover) and `migrations/20260713000002_is_demo.sql` (demo-flush flag)
+   → **Run** each.
+6. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
 
 Then create the founder login (once):
 
