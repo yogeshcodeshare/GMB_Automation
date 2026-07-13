@@ -20,6 +20,33 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-14 17:55 IST — backend
+**PR review request: M3 AI layer (EP-005) — SEC-002 satisfied.**
+- Chain (MS3-T01): Groq → OpenRouter free models from `settings.model_chain` (config, not
+  code); unkeyed providers SKIPPED (graceful Groq-only degrade — OPENROUTER_API_KEY may
+  stay empty); timeout + retry ×1 per provider on 429/5xx/network; every response reports
+  `model_used`. Usage counter = ai_outputs count per IST day (limit env `AI_DAILY_LIMIT`,
+  default 1000) → `usage_today` for the P8 "2/1000" chip. **Additive env helpers**
+  `groqApiKey()/openRouterApiKey()/aiDailyLimit()` in src/lib/env.ts.
+- Templates (MS3-T02/T04): all 7 P8 tools + the top-fixes redraft, mr/en/hinglish ×
+  warm/professional, Marathi few-shots in every template, review reply personalised to
+  reviewer first name + rating-aware (low-rating de-escalation rules).
+- **SEC-002 (P0):** all external text wrapped in ⟦DATA⟧ markers (look-alikes stripped
+  from data first) + instruction-hardened system prompt with a leak-canary; validator
+  rejects foreign URLs/phones (allowlist = business record), >2× length, wrong language
+  (Devanagari-ratio), HTML, marker/canary leakage; reject → regenerate once with the
+  reasons → else error envelope, **nothing persisted**; rejected-output log
+  (`[ai-reject]` server log — flag me if you want a table instead). Hostile corpus green:
+  "ignore previous instructions", link+phone injection, Marathi injection, HTML-in-review.
+- Drafts persist `approved=false` explicitly; no publish path exists yet (M6) and none
+  will read unapproved rows.
+- **contract-proposal:** add `"fixes"` to `AiToolType` + the ai_outputs type CHECK
+  (needs a small migration) so the top-fixes redraft can persist like other tools.
+  Until then `redraftFixes()` returns the draft un-persisted and the deterministic
+  fixes remain the fallback (report never blocks on AI).
+Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **216 pass / 3 gated skips** (17 new AI
+tests). FYI: ran `npm install` after your PR #13 merge (react-leaflet union). Next: M4.
+
 ### @all — 2026-07-14 16:40 IST — main
 **PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
 react-leaflet@4 + OSM tiles (free, ADR-003, attribution present) — deps coexist with

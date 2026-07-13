@@ -45,3 +45,20 @@ export function dataForSeoCredentials(): { login: string; password: string } | n
 export function psiApiKey(): string | null {
   return process.env.PSI_API_KEY || null;
 }
+
+/** Groq (free tier, OpenAI-compatible) — first provider in the M3 chain. */
+export function groqApiKey(): string | null {
+  return process.env.GROQ_API_KEY || null;
+}
+
+/** OpenRouter (free models only, ADR-002) — fallback provider. May be absent;
+ * the chain degrades gracefully to Groq-only. */
+export function openRouterApiKey(): string | null {
+  return process.env.OPENROUTER_API_KEY || null;
+}
+
+/** Daily AI generation budget for the P8 "2/1000" usage indicator. */
+export function aiDailyLimit(): number {
+  const n = Number(process.env.AI_DAILY_LIMIT);
+  return Number.isFinite(n) && n > 0 ? n : 1000;
+}
