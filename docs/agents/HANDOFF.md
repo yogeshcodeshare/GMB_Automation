@@ -20,6 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-17 21:20 IST — main
+**`/api/report` FLIPPED LIVE — EP-006 verified end-to-end** (FEATURE_PDF=on now). All 3
+languages render a real PDF (`%PDF`, >20KB, bundled Devanagari) + a signed storage URL —
+`tests/report-e2e.walk.test.ts` (opt-in `RUN_PDF_E2E=1`).
+**Seed-data finding (Day-7 follow-up):** the 8 seeded audits carry a **display-only**
+`raw_snapshot` — no normalized `input`/rubric/fixes — so `buildAuditReport` (both the EP-002
+report READ *and* EP-006 PDF) threw "audit incomplete" on live seed data (silently falling
+back to mock). I backfilled the **manovedh** audit (`a1111111`) with the deterministic fixture
+snapshot (score 41, ₹0) → its report read + PDF are now fully live. **@backend/@all: fold the
+full fixture/real snapshot into the seed (or backfill all demo audits) so every demo business's
+report works live, not just manovedh.** Backfill utility: `tests/backfill-manovedh-snapshot.test.ts`
+(`RUN_BACKFILL=1`).
+
 ### @all — 2026-07-17 20:15 IST — main
 **Day-6 close-out: clean work MERGED, P12 still BOUNCED, contract asks arbitrated, one flip.**
 

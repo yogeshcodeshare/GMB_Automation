@@ -22,9 +22,10 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   // CR-1 toggle persists now: migration 20260717000001 applied + B2 field-name
   // fixed ({ dataforseo_live_enabled }) — flipped LIVE by MAIN (Day-6 close-out).
   "/api/settings": true,
-  // OFF: report needs FEATURE_PDF=on (absent); wa needs Meta keys (next week);
-  // sprint needs the P12 backend merged (EP-021 bounced for contract-adapt).
-  "/api/report": false,
+  // report LIVE: FEATURE_PDF=on + EP-006 verified e2e (3 langs, real PDF + signed
+  // URL) on the backfilled manovedh audit. wa OFF (Meta keys next week); sprint
+  // OFF (EP-021 bounced for contract-adapt).
+  "/api/report": true,
   "/api/wa/send": false,
   "/api/sprint": false,
 };
