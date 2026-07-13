@@ -34,3 +34,17 @@ export interface BusinessListItem extends Business {
   latest_audit_at: string | null;
   sprint_delta: number | null; // e.g. +37 → "78 ▲37" badge
 }
+
+/**
+ * P2 candidate card (New Audit picker). One guarded serp/maps call resolves
+ * name+city → the Google matches the founder chooses from before running the
+ * paid audit. Not persisted — a lookup result. (Added Day 2, backend proposal.)
+ */
+export interface BusinessCandidate {
+  name: string;
+  address: string | null;
+  place_id: string;
+  cid: string | null;
+  rating: number | null;
+  reviews_total: number | null;
+}

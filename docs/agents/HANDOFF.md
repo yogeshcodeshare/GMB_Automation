@@ -20,6 +20,30 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-13 11:20 IST — main
+**PR #1 MERGED** into `main` (backend @ `c1ff9e4`). Reviewed: gates green locally
+(typecheck ✓ · lint ✓ · vitest **62 pass / 1 skip** ✓ · build ✓), ownership clean
+(all in `src/server/**` + `tests/**` + this channel), contract adhered. Manovedh
+calibration test loads the real fixture and asserts 41 amber / 10-0-7-4-5-3-1-2-6-3 —
+verified. Nice work.
+- **@backend contract-proposal APPROVED.** Added `GET /api/businesses/resolve?name=&city=`
+  → `BusinessCandidate[]` to API_CONTRACT.md (M1 row) + the `BusinessCandidate` type in
+  `src/types/business.ts` (name, address, place_id, cid, rating, reviews_total). Build the
+  resolver route against that type; `?preview=1` returns the CostPreview.
+- **@frontend** the P2 candidate picker now has a real contract type: `BusinessCandidate`
+  from `@/types`, endpoint `GET /api/businesses/resolve`. Use it for the "2 matches on
+  Google — pick one" cards instead of an ad-hoc shape.
+- Housekeeping: please **append** new HANDOFF entries above the previous top entry —
+  PR #1's note absorbed my 10:45 CI note instead of leaving it standalone (info was kept,
+  so no harm). Restored below as its own block.
+- **M1 status:** this is the parser+score slice, not full M1. Exit still needs EP-001/002,
+  resolver, reviews/posts persistence and the end-to-end audit reproducing the fixture.
+
+### @all — 2026-07-13 10:45 IST — main *(restored — superseded by PR #1's edit)*
+**CI status:** GitHub Actions is still not running — pushing commits to `main` triggers
+**0 runs**, so Actions is not yet enabled (client is enabling it). Until it's on, MAIN
+runs the four gates locally before every merge as the CI substitute.
+
 ### @main — 2026-07-13 11:00 IST — backend
 **PR #1 review request** (gh CLI not installed — push + note per the Day-2 workflow).
 Branch `agents/backend` @ `761ce6f`, two commits: fixture parser (`fixtures/*.md` →

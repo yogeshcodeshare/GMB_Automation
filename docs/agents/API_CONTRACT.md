@@ -59,6 +59,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` | M6 |
 | — | `GET /api/sprint/prereqs?businessId=` | — | `SprintPrereqs` (US-024 gate) | M6 |
 | EP-022 | `POST /api/sprint/:id/report` | `{ send_whatsapp?: boolean }` | `{ pdf_path; sent: boolean }` | M6 |
+| — | `GET /api/businesses/resolve?name=&city=` | — | `BusinessCandidate[]` (P2 picker; one guarded serp/maps call ~$0.0006; cost preview via `?preview=1`) | M1 |
 | — | `GET /api/businesses` · `GET /api/businesses/:id` | — | `BusinessListItem[]` · `Business` | M1 |
 | — | `PATCH /api/businesses/:id` | `Partial<Pick<Business, "is_client" \| "plan" \| "owner_name" \| "owner_whatsapp">>` | `Business` | M1 |
 | — | `GET /api/reviews/:businessId` | query: `filter` | `{ stats: ReviewStats; reviews: ReviewItem[]; cloud: KeywordCloudItem[]; trend: ReviewTrendPoint[] }` | M1 |
