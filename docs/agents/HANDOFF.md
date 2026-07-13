@@ -144,6 +144,57 @@ Actions now enabled (CI fires on this push). **🎯 MVP GATE MET** — Yogesh ap
 Gates: typecheck ✓ · lint ✓ · vitest (file) 7/7 · full suite after CR-2/3. On seam
 duty for frontend's ₹0 flips per DAY5_INTEGRATION — post gaps here, same-day fixes.
 
+### @main — 2026-07-15 15:35 IST — frontend
+**Day-5 integration + CR-1 + CR-3 — 2 commits pushed (`agents/frontend` @ `5adb6ec`).**
+Gates: typecheck ✓ · lint ✓ · in-browser verified (all screens, both CRs, all
+blocked-state precedence). **Ran a multi-agent adversarial review of my own diff before
+committing — it caught 6 real defects, all fixed + re-verified (details below).**
+
+**LIVE_ENDPOINTS flip verdicts** (flipped ON, mock fallback kept; verified requests fire
+and fall back gracefully on the unauthed dev route — 401 → mock, screen renders identical):
+- `dashboard/stats` ✓ ON · `businesses` (+ switcher) ✓ ON · `spend/today` ✓ ON ·
+  `reviews/:id` ✓ ON · `ai/generate` ✓ ON (Groq) · `audit/:id` ✓ ON (seeded `a1111111…`).
+- **⚠ I can only confirm the FALLBACK path** — the dev route is unauthed so every live
+  request 401s. **@main please do the authed localhost walk** (`create-founder` + login →
+  /dashboard) to confirm the seed data actually reads through, then flip back any that
+  misbehave. This is the "coordinate with MAIN for founder-session verification" step.
+- `businesses/resolve` + `posts-audit` stay **OFF** (DataForSEO-deferred). `settings`,
+  `report` OFF (no confirmed read route; CR-1 toggle persists via local state).
+
+**CR-1** (DataForSEO deferred, client): Settings "Data sources" toggle (default OFF,
+helper text verbatim) + a **distinct slate blocked state** (`#EEF1F4`, NOT cap-hit red)
+on P2 search+run, P3 re-audit, P4 refresh+add, P5 run+money-keyword scans, each with the
+"Live data off — enable in Settings" link. LIVE_DATA_DISABLED envelope flips the toggle
+off app-wide. Toggle → all paid buttons enable/disable cross-screen (verified).
+
+**CR-3**: PDF language chooser (मराठी default/English/Hinglish) before Generate PDF
+(desktop + mobile) and in the WA modal; per-business memory; language chip on completion;
+filename carries the lang. Verified end-to-end incl. the WA-modal filename switching.
+
+**6 review defects fixed** (2 HIGH): (1) `liveKey()` longest-match — `/api/businesses`
+was shadowing the deferred PAID `/api/businesses/resolve`, silently routing P2 search
+live; (2) empty live `/api/businesses` `[]` slipped past `?? mock` → `bizSel` undefined →
+whole-dashboard white-screen (now falls back on empty too); (3) P4 Add-competitor + (4)
+P2 Search were missing the cap-hit gate (could fire a paid call during the cap, and broke
+cap>live precedence); (5) `?rerun=1` auto-run bypassed both re-audit gates on a direct
+hit; (6) `useApiGet` ignored the POST body in effect deps (posts-audit wouldn't refetch
+on business change). All fixed + verified.
+
+**Needs / contract gaps (shims in place, none blocking):**
+- **@main authed flip-verification** (above) — gates the dev-route deletion (DSM #4). I
+  did NOT delete `app/public/dev` yet — **awaiting your confirm the flips read live on
+  merged main**, then I `git rm -r app/public/dev` next session.
+- `Tone` still `warm|professional` in `@/types` (DSM said it'd gain `"festive"`) — P8
+  maps Festive→warm for now; add `"festive"` if you want it distinct.
+- `PdfLang` (mr|en|hinglish) is a local shim in app-state — promote to `PdfLanguage` in
+  `@/types` + add `lang` to the EP-006 request type when convenient (CR-3).
+- CR-1 `PATCH /api/settings { dataforseo_live }` route doesn't exist yet — toggle is
+  local-only; wire persistence when the route lands.
+- `LIVE_DATA_DISABLED` isn't in the `ErrorCode` union yet — my handler string-matches it;
+  add it to `@/types` so paid routes can return it typed.
+- Go-live nuance: an empty real account currently falls back to the 6-mock shell (safe,
+  no crash) rather than a true empty-dashboard — a Day-7 flush/go-live refinement.
+
 ### @all — 2026-07-15 13:20 IST — main
 **🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
 `b00cb32`.** **SEC-003 (P0) VERIFIED** — `esc()` entity-encodes every dynamic value; CSP meta

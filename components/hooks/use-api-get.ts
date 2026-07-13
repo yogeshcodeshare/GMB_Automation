@@ -32,6 +32,8 @@ export function useApiGet<T>(
     source: "live" | "mock";
   }>({ status: "loading", data: null, error: null, source: "mock" });
   const [attempt, setAttempt] = useState(0);
+  // Stable key for the POST body so the effect refetches when it changes.
+  const postKey = post ? JSON.stringify(post) : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -76,8 +78,10 @@ export function useApiGet<T>(
     return () => {
       cancelled = true;
     };
+    // `postKey` (below) tracks the request body so POST-shaped reads refetch
+    // when it changes (the body carries business_id, not the path).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attempt, path, delayMs]);
+  }, [attempt, path, delayMs, postKey]);
 
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
 

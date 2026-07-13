@@ -5,37 +5,64 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/components/shell/app-state";
-import {
-  auditPdfNameMock,
-  auditReportMock,
-} from "@/components/mocks/audit-report";
+import { auditReportMock } from "@/components/mocks/audit-report";
+import { SEEDED_AUDIT_ID } from "@/components/mocks/businesses";
 import { waRecentContactsMock } from "@/components/mocks/wa-contacts";
+import { useApiGet } from "@/components/hooks/use-api-get";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FixesCard } from "@/components/report/fixes-card";
 import { RubricCard } from "@/components/report/rubric-card";
 import { BandLabel, ScoreGauge } from "@/components/report/score-gauge";
 import { WaModal } from "@/components/report/wa-modal";
+import {
+  PDF_LANG_LABEL,
+  PdfLangPicker,
+} from "@/components/report/pdf-lang-picker";
+import type { PdfLang } from "@/components/shell/app-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnChip } from "@/components/ui/conn";
 import { useToast } from "@/components/ui/toast";
 
+/** manovedh_GMB_Audit_41_<lang>.pdf — EP-006 names it server-side; UI mirrors. */
+function pdfNameFor(lang: PdfLang): string {
+  return `मनोवेध_GMB_Audit_41_${lang}.pdf`;
+}
+
 const CAPTION =
   "text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft";
 
-/** P3 Audit Report — the sales weapon (Manovedh fixture until Day 5). */
+/** P3 Audit Report — the sales weapon (live EP-002 read, mock fallback). */
 export default function ReportPage() {
   const router = useRouter();
   const toast = useToast();
-  const { bizSel, setBizSelId, capHit, catApplied } = useAppState();
-  const report = auditReportMock;
+  const {
+    bizSel,
+    setBizSelId,
+    bizSelIsFixture,
+    capHit,
+    catApplied,
+    liveDataEnabled,
+    pdfLangFor,
+    setPdfLang,
+  } = useAppState();
+  // Seeded fixture audit (a111…) — the businesses list doesn't carry a
+  // latest_audit_id yet (contract gap raised in HANDOFF).
+  const reportQ = useApiGet(
+    `/api/audit/${SEEDED_AUDIT_ID}`,
+    auditReportMock,
+  );
+  const report = reportQ.data ?? auditReportMock;
 
   const [isClient, setIsClient] = useState(report.business.is_client);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfChooserOpen, setPdfChooserOpen] = useState(false);
+  const [pdfDoneLang, setPdfDoneLang] = useState<PdfLang | null>(null);
   const [waOpen, setWaOpen] = useState(false);
   const [waSentAt, setWaSentAt] = useState<string | null>(null);
 
   // Workspace pages carry full data for the fixture business only (mock phase).
-  if (bizSel.id !== report.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div
@@ -70,6 +97,33 @@ export default function ReportPage() {
     );
   }
 
+  if (reportQ.status === "loading") {
+    return (
+      <section className="flex flex-col gap-[14px]">
+        <Skeleton className="h-[130px]" />
+        <div className="flex flex-wrap gap-[14px]">
+          <Skeleton className="h-[260px] min-w-[250px] flex-1" />
+          <Skeleton className="h-[260px] min-w-[300px] flex-[2.2]" />
+        </div>
+        <Skeleton className="h-[280px]" />
+      </section>
+    );
+  }
+
+  if (reportQ.status === "error") {
+    return (
+      <Card className="flex max-w-[560px] flex-col items-start gap-3 px-6 py-7">
+        <div className="text-[13.5px] font-bold text-band-crit">
+          Couldn&apos;t load the audit report
+        </div>
+        <div className="text-[12.5px] text-ink-soft">{reportQ.error}</div>
+        <Button variant="ghost" size="xs" onClick={reportQ.retry}>
+          Retry
+        </Button>
+      </Card>
+    );
+  }
+
   const snap = report.audit.raw_snapshot as {
     kg_id?: string;
     address?: string;
@@ -79,15 +133,23 @@ export default function ReportPage() {
     audited_at?: string;
   };
 
-  const genPdf = () => {
+  // CR-3: Generate PDF opens the language chooser first (per-business memory).
+  const pdfLang = pdfLangFor(bizSel.id);
+
+  const genPdf = (lang: PdfLang) => {
+    setPdfChooserOpen(false);
+    setPdfLang(bizSel.id, lang);
     setPdfBusy(true);
+    // EP-006 request would carry { lang } here on Day 5.
     setTimeout(() => {
       setPdfBusy(false);
-      toast(`PDF ready — ${auditPdfNameMock}`);
+      setPdfDoneLang(lang);
+      toast(`PDF ready — ${pdfNameFor(lang)} · ${PDF_LANG_LABEL[lang]}`);
     }, 1300);
   };
 
-  const sendWa = () => {
+  const sendWa = (_phone: string, lang: PdfLang) => {
+    setPdfLang(bizSel.id, lang);
     setWaOpen(false);
     setWaSentAt(
       new Date().toLocaleString("en-IN", {
@@ -148,9 +210,19 @@ export default function ReportPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={genPdf} loading={pdfBusy}>
-            {pdfBusy ? "Generating PDF…" : "Generate PDF (मराठी)"}
+          <Button
+            onClick={() => setPdfChooserOpen(true)}
+            loading={pdfBusy}
+          >
+            {pdfBusy
+              ? "Generating PDF…"
+              : `Generate PDF (${PDF_LANG_LABEL[pdfLang]})`}
           </Button>
+          {pdfDoneLang && !pdfBusy && (
+            <span className="self-center whitespace-nowrap text-[11.5px] font-semibold text-band-good">
+              ✓ PDF · {PDF_LANG_LABEL[pdfDoneLang]}
+            </span>
+          )}
           <Button variant="secondary" onClick={() => setWaOpen(true)}>
             Send on WhatsApp
           </Button>
@@ -166,6 +238,14 @@ export default function ReportPage() {
               className="cursor-not-allowed rounded-lg border-[1.5px] border-[rgba(27,35,33,0.10)] bg-bg-app px-4 py-[9px] text-[13px] font-semibold text-ink-faint"
             >
               Re-audit paused
+            </button>
+          ) : !liveDataEnabled ? (
+            <button
+              disabled
+              title="DataForSEO live data is off — enable it in Settings"
+              className="cursor-not-allowed rounded-lg border border-[#C9D2DB] bg-[#EEF1F4] px-4 py-[9px] text-[13px] font-semibold text-[#8697A6]"
+            >
+              Re-audit · live data off
             </button>
           ) : (
             <Button
@@ -394,10 +474,10 @@ export default function ReportPage() {
       <div className="sticky bottom-0 z-[60] flex gap-2 rounded-card border border-[rgba(27,35,33,0.12)] bg-bg-surface p-[10px] shadow-[0_-6px_20px_rgba(27,35,33,0.12)] min-[920px]:hidden">
         <button
           type="button"
-          onClick={genPdf}
+          onClick={() => setPdfChooserOpen(true)}
           className="flex-1 rounded-[9px] bg-brand px-2 py-3 text-[13px] font-bold text-white"
         >
-          Generate PDF (मराठी)
+          Generate PDF ({PDF_LANG_LABEL[pdfLang]})
         </button>
         <button
           type="button"
@@ -408,14 +488,69 @@ export default function ReportPage() {
         </button>
       </div>
 
+      {/* CR-3 — PDF language chooser (opens before Generate PDF) */}
+      {pdfChooserOpen && (
+        <PdfLangChooser
+          initial={pdfLang}
+          onCancel={() => setPdfChooserOpen(false)}
+          onConfirm={genPdf}
+        />
+      )}
+
       {waOpen && (
         <WaModal
-          pdfName={auditPdfNameMock}
+          pdfNameFor={pdfNameFor}
+          initialLang={pdfLang}
           recent={waRecentContactsMock}
           onClose={() => setWaOpen(false)}
           onSend={sendWa}
         />
       )}
     </section>
+  );
+}
+
+/** Small modal that picks the PDF language before generating (CR-3). */
+function PdfLangChooser({
+  initial,
+  onCancel,
+  onConfirm,
+}: {
+  initial: PdfLang;
+  onCancel: () => void;
+  onConfirm: (lang: PdfLang) => void;
+}) {
+  const [lang, setLang] = useState<PdfLang>(initial);
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-[rgba(15,20,18,0.55)]"
+        onClick={onCancel}
+      />
+      <div className="relative w-full max-w-[400px] animate-in fade-in slide-in-from-bottom-1 rounded-modal bg-bg-surface px-6 py-[22px] shadow-modal duration-200">
+        <div className="mb-1 text-[16px] font-bold">Generate report PDF</div>
+        <div className="mb-[14px] text-[12.5px] text-ink-soft">
+          Choose the language — the report renders fully in it (Devanagari
+          included).
+        </div>
+        <PdfLangPicker value={lang} onChange={setLang} className="mb-[18px]" />
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border-[1.5px] border-[rgba(27,35,33,0.16)] bg-bg-surface px-4 py-[9px] text-[13px] font-semibold hover:border-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(lang)}
+            className="rounded-lg bg-brand px-5 py-[9px] text-[13px] font-semibold text-white hover:bg-brand-hover"
+          >
+            Generate PDF
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

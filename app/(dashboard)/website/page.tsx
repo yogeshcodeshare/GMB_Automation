@@ -64,12 +64,12 @@ function depthMarkerPct(words: number): number {
 /** P3b Website Audit — every check feeds the single "Website 6/10" rubric row. */
 export default function WebsiteAuditPage() {
   const toast = useToast();
-  const { bizSel, setBizSelId } = useAppState();
+  const { bizSel, setBizSelId, bizSelIsFixture } = useAppState();
   const report = auditReportMock;
   const web = websiteAuditMock;
   const [copied, setCopied] = useState<number | null>(null);
 
-  if (bizSel.id !== report.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div

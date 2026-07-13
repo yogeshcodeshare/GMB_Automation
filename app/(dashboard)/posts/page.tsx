@@ -39,7 +39,7 @@ function quarterLabel(bucket: PostTimelineBucket, i: number): string {
 
 /** P7 Post Audit — the "inactive business" sales evidence. */
 export default function PostAuditPage() {
-  const { bizSel, setBizSelId } = useAppState();
+  const { bizSel, setBizSelId, bizSelIsFixture } = useAppState();
   const postBody = useMemo(() => ({ business_id: bizSel.id }), [bizSel.id]);
   // EP-013 via the api layer — LIVE_ENDPOINTS flag OFF until Day 5.
   const { status, data, error, retry } = useApiGet(
@@ -56,7 +56,7 @@ export default function PostAuditPage() {
   );
   const [compare, setCompare] = useState(false);
 
-  if (bizSel.id !== auditReportMock.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div
