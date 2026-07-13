@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { AuditReport, RubricRow } from "@/types";
+import type { AuditReport, PdfLanguage, RubricRow } from "@/types";
 
 /**
  * MS4-T01 + CR-2/CR-3 — the report template (EP-006). Server-rendered HTML →
@@ -10,8 +10,9 @@ import type { AuditReport, RubricRow } from "@/types";
  * CR-3: mr | en | hinglish copy — deterministic strings, no AI.
  */
 
-/** Contract-proposal `PdfLanguage` — local alias until @/types lands it. */
-export type PdfLanguage = "mr" | "en" | "hinglish";
+/** Canonical PdfLanguage now lives in @/types (landed Day 6) — re-exported
+ * here so pdf-service consumers keep one import site. */
+export type { PdfLanguage } from "@/types";
 
 export const PDF_LANGUAGES: PdfLanguage[] = ["mr", "en", "hinglish"];
 

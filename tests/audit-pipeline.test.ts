@@ -144,6 +144,7 @@ function mockedDfs() {
   const dfs = new DataForSeoClient({
     guard: new SpendGuard(store),
     credentials: { login: "l", password: "p" },
+    liveGate: async () => {}, // gate OPEN — these tests exercise the guarded flow
     fetchImpl: (async () => {
       const next = queue.shift();
       if (!next) throw new Error("mock queue empty");
@@ -219,6 +220,7 @@ describe("EP-001 pipeline (mocked vendor, in-memory db)", () => {
     const dfs = new DataForSeoClient({
       guard: new SpendGuard(store),
       credentials: { login: "l", password: "p" },
+      liveGate: async () => {}, // gate OPEN
       fetchImpl: (async () => {
         const next = queue.shift();
         if (!next) throw new Error("mock queue empty");

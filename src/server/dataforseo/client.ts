@@ -59,8 +59,11 @@ export interface DfsClientDeps {
   credentials: { login: string; password: string } | null;
   /** CR-1 live-data master switch: awaited at EVERY paid entry BEFORE the
    * spend reserve and before any network I/O. Throws LiveDataDisabledError
-   * while settings.dataforseo_live_enabled is false (the default). */
-  liveGate?: () => Promise<void>;
+   * while settings.dataforseo_live_enabled is false (the default).
+   * REQUIRED by design (PM fix-list, Day 6): a caller that could "forget"
+   * an optional gate would silently lose the kill-switch. Tests that want
+   * the gate open pass an explicit no-op. */
+  liveGate: () => Promise<void>;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
   maxPollMs?: number;
@@ -199,7 +202,7 @@ export class DataForSeoClient {
     estimateUsd: number,
     body: unknown
   ): Promise<R[]> {
-    if (this.deps.liveGate) await this.deps.liveGate(); // CR-1: before everything
+    await this.deps.liveGate(); // CR-1: before everything
     this.authHeader(); // fail fast on missing creds BEFORE reserving spend
     return this.deps.guard.guarded(path, estimateUsd, async () => {
       const envelope = await this.request<R>(path, body);
@@ -222,7 +225,7 @@ export class DataForSeoClient {
     estimateUsd: number,
     body: unknown
   ): Promise<R[]> {
-    if (this.deps.liveGate) await this.deps.liveGate(); // CR-1: before everything
+    await this.deps.liveGate(); // CR-1: before everything
     this.authHeader();
     const posted = await this.deps.guard.guarded(postPath, estimateUsd, async () => {
       // NO transport retry on task_post — a duplicate would double-charge.
