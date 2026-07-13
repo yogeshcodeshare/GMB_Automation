@@ -3,18 +3,18 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const RECENT = ["98220 41122 · owner", "97654 30988 · reception"];
-
 /**
  * WhatsApp send modal — +91 phone input, recent chips, PDF attachment
  * preview, Cancel/Send (EP-007 on Day 5; feature-flagged until keys arrive).
  */
 export function WaModal({
   pdfName,
+  recent,
   onClose,
   onSend,
 }: {
   pdfName: string;
+  recent: string[];
   onClose: () => void;
   onSend: (phone: string) => void;
 }) {
@@ -58,7 +58,7 @@ export function WaModal({
           Recent
         </div>
         <div className="mb-3 flex flex-wrap gap-[6px]">
-          {RECENT.map((r) => (
+          {recent.map((r) => (
             <button
               key={r}
               type="button"

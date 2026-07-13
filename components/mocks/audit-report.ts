@@ -11,6 +11,10 @@ import { businessesMock } from "./businesses";
  */
 
 const manovedh = businessesMock[0];
+
+/** EP-006 names the PDF server-side — mock mirrors "{short}_GMB_Audit_{score}.pdf". */
+export const auditPdfNameMock = "मनोवेध_GMB_Audit_41.pdf";
+
 const site = "https://manovedh.grexa.site";
 const q = encodeURIComponent(`${manovedh.name} Karad`);
 const pid = manovedh.place_id ?? "";

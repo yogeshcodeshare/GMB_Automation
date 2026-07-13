@@ -8,6 +8,7 @@ import type { BusinessListItem } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
 import { useMockQuery } from "@/components/hooks/use-mock-query";
 import { businessesMock } from "@/components/mocks/businesses";
+import { dashboardStatsMock } from "@/components/mocks/dashboard-stats";
 import {
   mediumDate,
   shortDate,
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { spend, capHit, setBizSelId } = useAppState();
   const { status, data, error, retry } = useMockQuery(businessesMock);
+  const stats = dashboardStatsMock; // ← GET /api/dashboard/stats on Day 5
   const [filter, setFilter] = useState<Filter>("all");
 
   const businesses = data ?? [];
@@ -77,10 +79,16 @@ export default function DashboardPage() {
             Audits this week
           </div>
           <div className="mb-[2px] mt-[6px] font-mono text-[26px] font-semibold">
-            12
+            {stats.audits_this_week}
           </div>
-          <div className="text-[12px] font-medium text-band-good">
-            +3 vs last week
+          <div
+            className={cn(
+              "text-[12px] font-medium",
+              stats.audits_delta >= 0 ? "text-band-good" : "text-band-crit",
+            )}
+          >
+            {stats.audits_delta >= 0 ? "+" : ""}
+            {stats.audits_delta} vs last week
           </div>
         </Card>
         <Card className="px-4 py-[14px]">
@@ -88,10 +96,10 @@ export default function DashboardPage() {
             Leads from checker
           </div>
           <div className="mb-[2px] mt-[6px] font-mono text-[26px] font-semibold">
-            4
+            {stats.leads_total}
           </div>
           <div className="text-[12px] text-ink-soft">
-            2 new today ·{" "}
+            {stats.leads_new_today} new today ·{" "}
             <Link
               href="/public-checker"
               className="font-semibold text-brand hover:text-brand-hover"
@@ -137,15 +145,13 @@ export default function DashboardPage() {
           </div>
           <div className="mb-[6px] mt-2 flex items-center gap-2">
             <span className="inline-flex items-center gap-[5px] rounded-chip bg-band-good-bg px-[10px] py-[3px] font-mono text-[14px] font-bold text-band-good">
-              ✓ 3
+              ✓ {stats.clients_on_track}
             </span>
             <span className="inline-flex items-center gap-[5px] rounded-chip bg-band-warn-bg px-[10px] py-[3px] font-mono text-[14px] font-bold text-band-warn">
-              ! 1
+              ! {stats.clients_behind}
             </span>
           </div>
-          <div className="text-[12px] text-ink-soft">
-            Patil Coaching: posts 6/8 behind
-          </div>
+          <div className="text-[12px] text-ink-soft">{stats.behind_note}</div>
         </Card>
       </div>
 
