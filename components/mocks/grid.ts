@@ -2,6 +2,7 @@ import type {
   AreaOwnershipRow,
   GridCompare,
   GridPoint,
+  GridPointDetail,
   GridScanResult,
   GridSize,
   RankEntry,
@@ -45,22 +46,38 @@ export const gridMayMatrix = [
 const KM_PER_DEG_LAT = 110.574;
 const kmPerDegLng = KM_PER_DEG_LAT * Math.cos((CENTER.lat * Math.PI) / 180);
 
-/** Matrix → GridPoint[] positioned around the business (radius spread). */
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+function compass(rowOff: number, colOff: number): string {
+  if (rowOff === 0 && colOff === 0) return "center";
+  // row 0 = north, so +rowOff = south; +colOff = east.
+  const angle = (Math.atan2(colOff, -rowOff) * 180) / Math.PI; // 0 = N, 90 = E
+  return COMPASS[(Math.round(((angle + 360) % 360) / 45) % 8)];
+}
+
+/** Matrix → GridPointDetail[] positioned around the business (radius spread).
+ * top5 is [] in mocks (the real popover pack comes from grid_points.top_ranks). */
 export function matrixToPoints(
   matrix: number[][],
   scanId: string,
   radiusKm: number,
-): GridPoint[] {
+): GridPointDetail[] {
   const n = matrix.length;
   const half = (n - 1) / 2;
   return matrix.flatMap((row, ri) =>
-    row.map((rank, ci) => ({
-      id: ri * n + ci + 1,
-      scan_id: scanId,
-      lat: CENTER.lat - ((ri - half) / half) * (radiusKm / KM_PER_DEG_LAT),
-      lng: CENTER.lng + ((ci - half) / half) * (radiusKm / kmPerDegLng),
-      rank: rank >= 20 ? null : rank,
-    })),
+    row.map((rank, ci) => {
+      const rowOff = ri - half;
+      const colOff = ci - half;
+      return {
+        id: ri * n + ci + 1,
+        scan_id: scanId,
+        lat: CENTER.lat - (rowOff / half) * (radiusKm / KM_PER_DEG_LAT),
+        lng: CENTER.lng + (colOff / half) * (radiusKm / kmPerDegLng),
+        rank: rank >= 20 ? null : rank,
+        distance_km: Math.round(Math.hypot(rowOff, colOff) * (radiusKm / half) * 10) / 10,
+        direction: compass(rowOff, colOff),
+        top5: [] as RankEntry[],
+      };
+    }),
   );
 }
 
@@ -122,10 +139,17 @@ export const gridJulResultMock: GridScanResult = {
     cost_usd: 0.0165,
     created_at: "2026-07-11T09:30:00+05:30",
   },
+  center: CENTER,
   points: matrixToPoints(gridJulMatrix, "scan-jul", 1.5),
   in_top3_pct: 56,
   weak_direction: "south-east (Malkapur side)",
   ownership: ownershipMock,
+  demand_hint: {
+    scanned_keyword: "hypno clinic",
+    scanned_volume: 20,
+    broader_keyword: "mental health clinic karad",
+    broader_volume: 320,
+  },
 };
 
 export const gridMayResultMock: GridScanResult = {
@@ -140,10 +164,12 @@ export const gridMayResultMock: GridScanResult = {
     cost_usd: 0.0165,
     created_at: "2026-05-02T10:05:00+05:30",
   },
+  center: CENTER,
   points: matrixToPoints(gridMayMatrix, "scan-may", 1.5),
   in_top3_pct: 24,
   weak_direction: "south-east (Malkapur side)",
   ownership: [],
+  demand_hint: null,
 };
 
 /** Scan-history rows (top-3 % comes with each GridScanResult). */
@@ -207,6 +233,7 @@ export const teleportResultMock: TeleportResult = {
     cost_usd: 0.0024,
     created_at: "2026-07-13T11:00:00+05:30",
   },
+  center: CENTER,
   point: {
     id: 1,
     scan_id: "scan-teleport",
