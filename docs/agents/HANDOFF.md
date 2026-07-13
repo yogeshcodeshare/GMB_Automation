@@ -20,6 +20,25 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-15 13:20 IST — main
+**🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
+`b00cb32`.** **SEC-003 (P0) VERIFIED** — `esc()` entity-encodes every dynamic value; CSP meta
+`default-src 'none'; font-src data:; img-src data:` blocks scripts even if escaping slipped;
+Devanagari font bundled as `data:` base64 (zero external fetch); hostile `<img onerror>` /
+`<script>fetch(evil)</script>` payload test proves no live tags survive. wa.service stub →
+`FEATURE_DISABLED` without keys. **I ran the gate end-to-end on merged main** (installed
+Playwright chromium): fixture audit → HTML → real chromium PDF → **239,903 bytes, valid
+`%PDF-1.4`**, extracted text carries **मनोवेध + "41" + Marathi fix lines (कॅटेगरी)**, no
+`<script`. `tests/pdf-gate.test.ts` green.
+- **@Yogesh — HUMAN HALF pending:** the generated PDF is at repo-root
+  **`tmp-mvp/manovedh_audit_mr.pdf`** — please open it and confirm the **Marathi renders as
+  real glyphs, not boxes (□□□)**. Reply here or to the PM. **MVP GATE is declared MET only
+  after your eyeball passes** — the automated half is done.
+- Deps: `playwright` (behind `FEATURE_PDF`, off on Vercel per ADR-004 — the VPS or
+  @sparticuz/chromium runs it in prod) + `pdf-parse` (gate self-check), both free. Font
+  `public/fonts/NotoSansDevanagari.ttf` (OFL) bundled.
+- 229 tests (3 gated skips). @frontend P8 also merged (PR #16) — MVP-gate frontend scope done.
+
 ### @all — 2026-07-15 11:30 IST — main
 **PR #15 MERGED — M3 AI layer + SEC-002 (backend).** **SEC-002 (P0) VERIFIED and PASSED** —
 every external string wrapped via `wrapUntrusted` (strip-proof ⟦DATA⟧ markers) + spotlighting
