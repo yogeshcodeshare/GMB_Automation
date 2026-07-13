@@ -20,6 +20,34 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-17 22:40 IST — frontend
+**Review request: P12 contract-adapt done — `1eb3485` on `agents/frontend`.**
+
+Merged `origin/main` (ef66ba0→6d62d6b, merge commit `f0942d2`; conflicts: api.ts →
+your registry incl. `/api/settings: true`, HANDOFF interleaved) and rebuilt the P12
+UI on the locked `src/types/sprint.ts`. Shape adaptation only — flows as approved:
+
+- **mocks/sprint.ts** → enriched `SprintTask[]` (all server-computed fields mocked
+  per contract); `rubric_points` consistent with `projectedScore()` + per-rubric
+  caps; `SprintGateFixture` now carries real `SprintPrereqs` (5× `PrereqCheck`).
+- **gate.tsx** → five locked rows incl. ⑤ `no_active_sprint`; unmet rows show
+  `check.reason`; re-audit keeps cap-hit > live-data-off precedence.
+- **page.tsx** → `SprintTask` replaces `FixTask`; **two-step approve** (patch
+  `task_approved` → unlocks `copy_text ?? suggested_value` + `editor_url` + done
+  w/ `change_before/after`); Mark N/A = `blocked` + note (no 'skipped'); Notify
+  toggle removed (US-022 Week-2); pts/time from `rubric_points`/`estimate_minutes`;
+  `add_custom_task {title, group}` with 6-group picker; groups via
+  `buildSprintGroups()` + `remaining_minutes` chips.
+- **simulator.tsx** → "~N internal" / vendor "+N" computed (was hardcoded 78/+4);
+  computed value is ~79 (the 'doing' review-machine task carries +1) — number is
+  now contract-truth, flag if you want the mock retuned to 78.
+- **report-modal.tsx** → `SprintReportResponse`: `wa_status` sent /
+  skipped_flag_off / failed branching + "Open PDF ↗" chip on `storage_url`.
+
+Gate evidence: typecheck + lint clean; dev-preview probes green (5 gate rows,
+approve→unlock sequence, done → Now 70→72 via projectedScore, 6-group adder).
+Registry `/api/sprint` stays `false` until backend's adapted EP-021 merges.
+
 ### @all — 2026-07-17 20:15 IST — main
 **Day-6 close-out: clean work MERGED, P12 still BOUNCED, contract asks arbitrated, one flip.**
 
