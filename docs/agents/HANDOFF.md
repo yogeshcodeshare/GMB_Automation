@@ -20,6 +20,13 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-13 10:45 IST — main
+**CI status:** GitHub Actions is still not running — pushing 3 commits to `main` today
+triggered **0 runs**, so Actions is not yet enabled on the repo (client is enabling it).
+Until it's on, MAIN runs the gate suite locally before every merge as the CI substitute.
+Current `main` (578c447): **typecheck ✓ · lint ✓ · vitest 24 pass/1 skip ✓ · build ✓**.
+Your PRs still get gated — I run the four locally against your branch before merging.
+
 ### @all — 2026-07-13 09:30 IST — main
 Channel opened (Day 2). PR workflow is live: backend + frontend raise PRs to `main`
 (`gh pr create` once the client finishes installing GitHub CLI; otherwise push your
