@@ -7,10 +7,9 @@ DDL, so the two migrations are applied once by hand (2 minutes):
 2. Paste the full contents of `migrations/20260712000001_init_schema.sql` → **Run**.
 3. Paste the full contents of `migrations/20260712000002_seed.sql` → **Run**.
 4. Paste the full contents of `migrations/20260712000003_spend_functions.sql` → **Run**.
-5. **Day-3 additions** — paste and **Run** each: `migrations/20260713000002_is_demo.sql`
-   (demo-flush flag) and `migrations/20260713000003_grid_results.sql` (durable grid scan
-   results — required for grid history on serverless). `20260713000001_grid_top_ranks.sql`
-   is optional (superseded by `grid_results`; harmless if already applied).
+5. **Day-3 additions** — paste and **Run** each: `migrations/20260713000001_grid_top_ranks.sql`
+   (per-point rank packs — powers the P5 grid popovers + ownership; grid degrades gracefully
+   without it) and `migrations/20260713000002_is_demo.sql` (demo-flush flag).
 6. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
 
 Then create the founder login (once):

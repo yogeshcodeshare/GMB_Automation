@@ -77,20 +77,29 @@ describe("rank extraction + metrics (MS2-T03/T07)", () => {
     expect(weakDirection(CENTER, flat)).toBeNull();
   });
 
-  it("ownership aggregates per business and always includes the target", () => {
-    const items = (rank: number) => [
-      { title: "Dominator", cid: "d", rank_group: 1, latitude: 17.3, longitude: 74.18 },
-      { title: "मनोवेध हिप्नोक्लिनिक", cid: "t-cid", rank_group: rank },
+  it("ownership derives from RankEntry packs and always includes the target", () => {
+    const pack = (rank: number) => [
+      { position: 1, name: "Dominator", rating: 4.8, reviews: 90, cid: "d", is_target: false },
+      { position: rank, name: "मनोवेध हिप्नोक्लिनिक", rating: 4.9, reviews: 30, cid: "t-cid", is_target: true },
     ];
     const rows = buildOwnership(
-      [{ items: items(11) }, { items: items(13) }],
-      { ...target, lat: CENTER.lat, lng: CENTER.lng },
+      [pack(11), pack(13)],
       1 // force the cut so the target is re-appended
     );
     const dominator = rows.find((r) => r.name === "Dominator");
-    expect(dominator).toMatchObject({ avg_rank: 1, best_rank: 1, top3_count: 2 });
+    expect(dominator).toMatchObject({
+      avg_rank: 1,
+      best_rank: 1,
+      top3_count: 2,
+      distance_km: null, // packs carry no coordinates (flagged in HANDOFF)
+    });
     const self = rows.find((r) => r.is_target);
-    expect(self).toMatchObject({ avg_rank: 12, best_rank: 11, worst_rank: 13 });
+    expect(self).toMatchObject({
+      avg_rank: 12,
+      best_rank: 11,
+      worst_rank: 13,
+      distance_km: 0,
+    });
   });
 });
 
@@ -211,9 +220,58 @@ describe("EP-003/004 engine (mocked vendor)", () => {
     if (!result || !("points" in result)) throw new Error("expected grid result");
     expect(result.in_top3_pct).toBe(89); // 8 of 9 pins ≤ 3
     expect(result.weak_direction).toBe("south-east");
+    // locked contract: center + GridPointDetail pins with per-pin top5
+    expect(result.center).toEqual({ lat: CENTER.lat, lng: CENTER.lng });
+    const centrePin = result.points.find((p) => p.distance_km === 0);
+    expect(centrePin?.top5.map((t) => t.name)).toEqual([
+      "Dominator",
+      "Runner Up",
+      "Target Biz",
+    ]);
+    expect(centrePin?.direction).toBe("center");
+    expect(result.points.every((p) => Array.isArray(p.top5))).toBe(true);
+    expect(result.demand_hint).toBeNull(); // volumes wiring flagged for later
     const target = result.ownership.find((r) => r.is_target);
     expect(target?.name).toBe("Target Biz");
     expect(result.ownership[0].name).toBe("Dominator");
+  });
+
+  it("top_ranks column missing → pins persist bare, popovers degrade to []", async () => {
+    const { client, tables } = miniDb(GRID_TABLES);
+    seedBusiness(tables);
+    const { dfs } = mockedVendor({ ranks: [2, 2, 2, 2, 1, 3, 2, 3, 4] });
+
+    // Simulate the un-applied migration: first insert (with top_ranks) errors.
+    const realFrom = client.from.bind(client);
+    let failedOnce = false;
+    (client as unknown as { from: (t: string) => unknown }).from = (t: string) => {
+      const q = realFrom(t) as unknown as Record<string, unknown>;
+      if (t === "grid_points" && !failedOnce) {
+        const realInsert = (q.insert as (rows: unknown) => unknown).bind(q);
+        q.insert = (rows: Array<Record<string, unknown>>) => {
+          if (rows.some((r) => "top_ranks" in r)) {
+            failedOnce = true;
+            return Promise.resolve({
+              data: null,
+              error: { message: "column grid_points.top_ranks does not exist" },
+            });
+          }
+          return realInsert(rows);
+        };
+      }
+      return q;
+    };
+
+    const started = await startGridScan({ dfs, db: client }, REQ);
+    await started.done;
+    expect(failedOnce).toBe(true);
+    expect(tables.grid_points).toHaveLength(9);
+    expect(tables.grid_points.every((p) => !("top_ranks" in p))).toBe(true);
+
+    const result = await getGridResult(client, String(tables.grid_scans[0].id));
+    if (!result || !("points" in result)) throw new Error("expected grid result");
+    expect(result.points.every((p) => p.top5.length === 0)).toBe(true);
+    expect(result.ownership).toEqual([]); // nothing to derive from — degraded, not broken
   });
 
   it("task_post 5xx is NOT retried (idempotency) → partial scan", async () => {
@@ -256,10 +314,23 @@ describe("EP-003/004 engine (mocked vendor)", () => {
     expect(store.entries[0].endpoint).toBe("serp/google/maps/live/advanced");
     const result = await getGridResult(client, String(tables.grid_scans[0].id));
     if (!result || "points" in result) throw new Error("expected teleport result");
+    expect(result.center).toEqual({ lat: CENTER.lat, lng: CENTER.lng });
     expect(result.top10.map((r) => r.name)).toContain("Target Biz");
     expect(result.top10.find((r) => r.is_target)?.position).toBe(5);
     expect(result.point.rank).toBe(5);
     expect(result.distance_km).toBeGreaterThan(0);
+  });
+
+  it("history list: GET /api/grid?businessId= source, newest first", async () => {
+    const { client, tables } = miniDb(GRID_TABLES);
+    seedBusiness(tables);
+    const a = mockedVendor({ ranks: [1, 1, 1, 1, 1, 1, 1, 1, 1] });
+    await (await startGridScan({ dfs: a.dfs, db: client }, REQ)).done;
+    const b = mockedVendor({ ranks: [2, 2, 2, 2, 2, 2, 2, 2, 2] });
+    await (await startGridScan({ dfs: b.dfs, db: client }, REQ)).done;
+    const { listGridScans } = await import("@/server/grid/engine");
+    const scans = await listGridScans(client, REQ.business_id);
+    expect(scans).toHaveLength(2);
   });
 
   it("compare: avg-rank delta + per-business movement", async () => {

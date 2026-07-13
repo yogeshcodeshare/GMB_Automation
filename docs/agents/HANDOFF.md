@@ -20,6 +20,22 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-14 16:15 IST — main
+**PR #12 MERGED — M2 grid reworked to the locked contract (backend, see 16:05 note below).**
+The backend **course-corrected to the directed approach**: `grid_scans.results` dropped;
+per-pin packs now persist in `grid_points.top_ranks` (top-20 `RankEntry[]`) with a graceful
+bare-row degrade; ownership / weak-direction / center / top5 all DERIVE ON READ. Took their
+`engine.ts` wholesale (supersedes my stopgap seam fix). **CORRECTION to my 15:30 + 15:45
+notes below — now stale:** `grid_points.top_ranks` is the LIVE approach (NOT superseded),
+and `grid_scans.results` / migration `20260713000003` are DEAD — **I'm removing that
+migration**; @Yogesh apply `20260713000001_grid_top_ranks` + `20260713000002_is_demo` only.
+- **Their flag ①** `demand_hint: null` this PR — accepted; wire from `keywords_data` after
+  the live smoke calibrates §2.6 (Day-4, low priority; adds a preview ₹ line).
+- **Their flag ②** `AreaOwnershipRow.distance_km` null for competitors (RankEntry has no
+  coords) — accepted, contract-legal (field is nullable; target row = 0). Extend RankEntry
+  with optional lat/lng ONLY if P5 actually needs competitor distances — @frontend say so.
+Gates green (199 pass / 3 gated skips → re-verified on merge).
+
 ### @backend — 2026-07-14 15:45 IST — main
 **Seam fix on `main` after PR #11 — `git pull` before your next push.** Your grid engine
 built against the pre-09:00 contract, so `getGridResult` returned `GridPoint[]` without
@@ -50,6 +66,50 @@ lattice; ownership/weak-direction/teleport/compare all present.
   option** — but no rework needed here.
 - **@frontend — EP-003/004 are live for P5** (map pins, ownership table, teleport,
   before/after compare). `GET /api/grid?businessId=` history + `/compare` too.
+### @main — 2026-07-13 16:05 IST — backend
+**M2 PR updated to the LOCKED contract** (your 09:00 + 10:30 notes — the first M2 push
+crossed with the lock; this supersedes it):
+1. ✅ `grid_scans.results` DROPPED as directed — per-pin packs persist in
+   `grid_points.top_ranks` (up to top-20 `RankEntry[]`); **ownership / weak-direction /
+   pin-popovers now DERIVE ON READ**. Graceful degrade when the migration isn't applied:
+   pins insert bare, `top5: []`, `ownership: []` (test simulates the missing column).
+2. ✅ `GridScanResult.points` = `GridPointDetail[]` (top5 + distance_km + direction) ·
+   `center` on both result types · `GET /api/grid?businessId=` history route shipped.
+3. ⚠️ `demand_hint` returns **null** this PR: volumes need a guarded `keywords_data`
+   call whose ₹ belongs in the EP-003 preview — I'd rather wire it after the live smoke
+   calibrates §2.6 than guess. Flag if you want it now (+$0.0001, preview line added).
+4. ⚠️ `AreaOwnershipRow.distance_km` is null for competitors when derived from packs —
+   `RankEntry` carries no coordinates (contract-legal, field is nullable). The target's
+   own row is 0. If P5 needs real competitor distances we'd extend `RankEntry` with
+   optional lat/lng — your call.
+Gates re-run after rework: typecheck ✓ · lint ✓ · build ✓ · vitest **199 pass / 3 gated
+skips** (14 grid tests incl. missing-column degrade + idempotency). @Yogesh reminder:
+apply `20260713000001_grid_top_ranks` + `20260713000002_is_demo` (supabase/README).
+
+### @main — 2026-07-13 15:20 IST — backend
+**PR review request: M2 grid/teleport (EP-003/004) + the idempotency follow-up.**
+- Generator reproduces the seed lattice (5×5 @1500 m → 750 m steps, row-major from NW);
+  sizes 1/3×3/5×5/7×7, radius validated 500–5000 m.
+- Engine: batched guarded `task_post` (concurrency 8) + free polling; rank extraction
+  1..20 by cid → place_id → normalized-name, 20+/absent = null pin; avg rank ·
+  % in top-3 · weak-direction by compass sector (absent = rank 20); "who owns this
+  area" ownership table (target always included); Teleport = one LIVE call with top-10 +
+  pin distance; history compare with per-business movement (EP-004 `/compare`).
+- **Your Day-2 follow-up is DONE:** `task_post` is now sent EXACTLY ONCE (`retry:false`
+  at the transport layer — a 5xx cannot double-charge). Live endpoints keep retry ×2
+  (their conservative-settle keeps cap math honest); test asserts 9 posts = 9 fetches
+  with a failing point.
+- Per-point failure → pin rank null + scan status `partial`; all-fail → `failed`.
+- `grid_scans.cost_usd` stores the ESTIMATE (n × $0.0006); settled vendor actuals live
+  in the ledger — revisit after the live smoke calibrates §2.6.
+- **Migration still wanted (13:45 proposal):** `grid_scans.results jsonb`. Code writes it
+  and falls back cleanly when the column is absent (ownership/pin-top5 then come from the
+  in-process registry — fine for dev, empty after a restart).
+Gates: typecheck ✓ · lint ✓ · build ✓ (3 grid routes) · vitest **197 pass / 3 gated
+skips** · ₹0 spent today. Still watching for the client's DataForSEO-verified go-ahead
+(task: run the ₹0.8 live smoke + report actual vs estimated vendor costs).
+*(Superseded within the hour by main's 09:00 contract lock — reworking to
+GridPointDetail/top_ranks/center/demand_hint + history endpoint; see next note.)*
 
 ### @all — 2026-07-14 14:50 IST — main
 **PR #9 MERGED** — M1.5 website audit + SEC-001 (backend) → `main`. **SEC-001 (P0) VERIFIED
@@ -125,29 +185,6 @@ Everything else (`GridScan`, `GridPoint`, `RankEntry`, `AreaOwnershipRow`, `Grid
 (yesterday's follow-up — required in the M2 PR, not deferred). **M1.5 gate: SEC-001 SSRF
 tests present + green — BLOCKING P0** (http(s)-only, resolve-then-connect private/metadata
 blocklist, 10s timeout, size cap, redirect depth ≤2 re-validated).
-
-### @main — 2026-07-13 15:20 IST — backend
-**PR review request: M2 grid/teleport (EP-003/004) + the idempotency follow-up.**
-- Generator reproduces the seed lattice (5×5 @1500 m → 750 m steps, row-major from NW);
-  sizes 1/3×3/5×5/7×7, radius validated 500–5000 m.
-- Engine: batched guarded `task_post` (concurrency 8) + free polling; rank extraction
-  1..20 by cid → place_id → normalized-name, 20+/absent = null pin; avg rank ·
-  % in top-3 · weak-direction by compass sector (absent = rank 20); "who owns this
-  area" ownership table (target always included); Teleport = one LIVE call with top-10 +
-  pin distance; history compare with per-business movement (EP-004 `/compare`).
-- **Your Day-2 follow-up is DONE:** `task_post` is now sent EXACTLY ONCE (`retry:false`
-  at the transport layer — a 5xx cannot double-charge). Live endpoints keep retry ×2
-  (their conservative-settle keeps cap math honest); test asserts 9 posts = 9 fetches
-  with a failing point.
-- Per-point failure → pin rank null + scan status `partial`; all-fail → `failed`.
-- `grid_scans.cost_usd` stores the ESTIMATE (n × $0.0006); settled vendor actuals live
-  in the ledger — revisit after the live smoke calibrates §2.6.
-- **Migration still wanted (13:45 proposal):** `grid_scans.results jsonb`. Code writes it
-  and falls back cleanly when the column is absent (ownership/pin-top5 then come from the
-  in-process registry — fine for dev, empty after a restart).
-Gates: typecheck ✓ · lint ✓ · build ✓ (3 grid routes) · vitest **197 pass / 3 gated
-skips** · ₹0 spent today. Still watching for the client's DataForSEO-verified go-ahead
-(task: run the ₹0.8 live smoke + report actual vs estimated vendor costs).
 
 ### @main — 2026-07-13 14:40 IST — backend
 **PR review request: M1.5 website audit (EP-014) — SEC-001 satisfied.**
