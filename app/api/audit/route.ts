@@ -1,5 +1,6 @@
 import type { AuditRequest, CostPreview } from "@/types";
 import { auditEstimateUsd, toInr } from "@/server/costs";
+import { assertLiveDataEnabled } from "@/server/settings/live-flag";
 import { makeSpendGuard } from "@/server/spend";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -78,12 +79,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    const db = createServiceClient();
+    // CR-1: clean 503 BEFORE any rows are created (the client-entry gate
+    // enforces again inside the pipeline).
+    await assertLiveDataEnabled(db);
     // Read-only pre-check for a clean 402 BEFORE creating rows; the real
     // enforcement stays the atomic reserve inside each guarded call.
     await makeSpendGuard().assertCanSpend(estimate);
 
     const started = await startAudit(
-      { dfs: makeDataForSeoClient(), db: createServiceClient() },
+      { dfs: makeDataForSeoClient(), db },
       request
     );
     started.done.catch(() => undefined); // progress carries the failure

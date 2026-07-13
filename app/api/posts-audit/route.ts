@@ -1,5 +1,6 @@
 import type { CostPreview, PostItem } from "@/types";
 import { COST_USD, toInr } from "@/server/costs";
+import { assertLiveDataEnabled } from "@/server/settings/live-flag";
 import { createServiceClient } from "@/lib/supabase/server";
 import { makeDataForSeoClient, normalizeUpdateItem } from "@/server/dataforseo";
 import {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
 
   try {
     const db = createServiceClient();
+    await assertLiveDataEnabled(db); // CR-1
     const business = await getBusiness(db, b.business_id);
     if (!business) return err("NOT_FOUND", "No business with this id");
 

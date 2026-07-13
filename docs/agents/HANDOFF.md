@@ -20,6 +20,18 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-16 09:40 IST — main
+**PR #18 MERGED — CR-1 live-data master switch (backend).** Verified: fail-safe OFF
+(missing column/row/read-error all → false, so no paid call reaches the vendor even
+pre-migration), defense-in-depth (route `assertLiveDataEnabled` + client-entry gate),
+previews/free calls unaffected; `live-gate` test proves paid methods throw
+`LIVE_DATA_DISABLED` with zero transport + zero ledger. Your 3 CR-1 sub-proposals resolved:
+- ✅ `ErrorCode += "LIVE_DATA_DISABLED"` added to `@/types` (503) — drop the temporary cast.
+- ✅ Migration already shipped as mine `20260716000001_dataforseo_live_enabled.sql` (@Yogesh apply).
+- ✅ `GET/PATCH /api/settings` added to API_CONTRACT.md (P11 Data-sources toggle, founder-auth).
+So the go-live sequence is: verify DFS account (support chat, 40104) → apply the migration →
+`PATCH /api/settings {dataforseo_live_enabled:true}` → flip the paid `LIVE_ENDPOINTS` keys.
+
 ### @all — 2026-07-16 09:00 IST — main
 **DAY 5 = INTEGRATION DAY. DB IS CURRENT — no more schema blockers.** Client applied all 3
 migrations; I verified them LIVE (`tests/schema-sanity.test.ts`): `grid_points.top_ranks` ✓,
@@ -42,6 +54,27 @@ Actions now enabled (CI fires on this push). **🎯 MVP GATE MET** — Yogesh ap
   `/api/dashboard/stats`, `/api/businesses`, `/api/spend/today`, `/api/reviews` → `true`
   (mock fallback stays). Verify each against the live seed data, one commit per flip.
 - CR-2 / CR-3: awaiting specs from the PM — will relay when defined.
+### @main — 2026-07-15 15:05 IST — backend
+**PR review request: CR-1 live-data master switch — server-enforced, DEFAULT OFF.**
+- Enforced at the DataForSeoClient entry beside SpendGuard: `liveGate` runs BEFORE the
+  auth header, BEFORE the atomic reserve, BEFORE any network I/O. Route pre-checks give
+  the clean 503 on EP-001, `/api/businesses/resolve`, EP-003 (grid POST; EP-004 reads
+  stay open — DB-only), EP-013. NOT gated: EP-005 AI, EP-006 PDF, reviews/dashboard/
+  spend reads. Cost PREVIEWS still work while off (₹ visible, nothing runs).
+- `GET/PATCH /api/settings` ships (founder-auth via middleware) returning
+  `{ dataforseo_live_enabled }`.
+- **Merge-blocking tests green:** flag false ⇒ all 7 paid client methods throw, fetch
+  spy 0 calls, spend_ledger 0 rows; flag true ⇒ normal guarded flow; engine-level
+  defense-in-depth (scan lands "failed", ₹0); live smoke now honours the flag too.
+- **Three contract-proposals for you:**
+  1. `ErrorCode` += `"LIVE_DATA_DISABLED"` (503). I emit it verbatim via a contained
+     cast in errFrom until @/types lands it.
+  2. Migration: `alter table settings add column if not exists dataforseo_live_enabled
+     boolean not null default false;` — my reader treats a MISSING column as false
+     (default OFF), so order doesn't matter, but PATCH needs the column to toggle ON.
+  3. Contract rows: `GET/PATCH /api/settings` (P11 "Data sources" toggle).
+Gates: typecheck ✓ · lint ✓ · vitest (file) 7/7 · full suite after CR-2/3. On seam
+duty for frontend's ₹0 flips per DAY5_INTEGRATION — post gaps here, same-day fixes.
 
 ### @all — 2026-07-15 13:20 IST — main
 **🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
@@ -120,6 +153,7 @@ email link. **@Yogesh: please open the chat at app.dataforseo.com and ask suppor
 verify the account for API use** — quote error 40104. Stopped per plan; ₹0 burned
 (the failed attempt settles its conservative $0.002 estimate on the ledger, which is
 the guard working as designed). Smoke re-runs in one command on the next go-ahead.
+*(Resolved 15 Jul: client DEFERRED DataForSEO — CR-1 master switch ships today.)*
 
 ### @main — 2026-07-14 19:10 IST — backend
 **PR review request: M4 PDF + WA stub (EP-006/007) — SEC-003 satisfied. MVP GATE

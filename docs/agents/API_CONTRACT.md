@@ -65,6 +65,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | — | `GET /api/businesses` · `GET /api/businesses/:id` | — | `BusinessListItem[]` · `Business` | M1 |
 | — | `PATCH /api/businesses/:id` | `Partial<Pick<Business, "is_client" \| "plan" \| "owner_name" \| "owner_whatsapp">>` | `Business` | M1 |
 | — | `GET /api/reviews/:businessId` | query: `filter` | `{ stats: ReviewStats; reviews: ReviewItem[]; cloud: KeywordCloudItem[]; trend: ReviewTrendPoint[] }` | M1 |
+| — | `GET /api/settings` · `PATCH /api/settings` | `Partial<Settings>` (PATCH) | `Settings` (P11 "Data sources" toggle incl. `dataforseo_live_enabled`, founder-auth) | CR-1 |
 | — | `GET /api/health` | — | `{ service; ts }` (public) | **M0 ✅** |
 
 Unnumbered rows are contract additions the pages in §2.7b require; MAIN agent owns their
