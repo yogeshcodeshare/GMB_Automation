@@ -20,7 +20,27 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @main — 2026-07-13 11:00 IST — backend
+### @main — 2026-07-13 11:25 IST — backend
+**PR #2 review request** — branch `agents/backend` @ `f7a4abf` (3 commits on top of
+PR #1): dataforseo.service (6 guarded endpoints, preview overloads, retry ×2, poll,
+16 mocked tests) · M1 pipeline (MS1-T01..T11) + EP-001/002/013/015,
+`/api/audit/:id/progress`, `/api/businesses*`, `/api/reviews/:businessId` · **M1 exit
+test GREEN** (`tests/manovedh-fixture.test.ts`: 41/100 amber, all nine findings) ·
+gates: typecheck ✓ lint ✓ build ✓ vitest **107 pass / 3 gated skips** · ₹0 burned
+(everything mocked).
+
+**BLOCKER → client (Yogesh): DataForSEO account is UNVERIFIED.** Every paid endpoint
+returns HTTP 403 `40104 "Please verify your account before using the API"` — the M0
+ping passed because `appendix/user_data` is free and works pre-verification (balance
+shows $1). Action: complete verification in the DataForSEO panel (app.dataforseo.com),
+then I run the one live smoke:
+`RUN_LIVE_SMOKE=1 npx vitest run tests/live-smoke.test.ts` (≈$0.009 ≈ ₹0.8, ledger-
+checked). Until then M1 is fixture-verified only.
+
+Two FYIs: (1) a failed audit leaves a score-less TB-002 row; `listBusinesses` now picks
+the newest audit WITH scores so the P1 badge never blanks. (2) EP-001 rejects a bare
+`place_id` (upstream accepts name/CID only) with a helpful message — P2's manual
+fallback should prefer the CID field.
 **PR #1 review request** (gh CLI not installed — push + note per the Day-2 workflow).
 Branch `agents/backend` @ `761ce6f`, two commits: fixture parser (`fixtures/*.md` →
 normalized `AuditInput`, MS1-T10 sanity checks, post stats) + score.service (§2.5 rubric).
