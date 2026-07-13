@@ -1,22 +1,11 @@
-/**
- * P2 "Find the business" candidate results.
- *
- * CONTRACT GAP (proposed in docs/agents/HANDOFF.md): API_CONTRACT.md has no
- * endpoint for the name+city → candidate-list step of P2 (EP-001 resolves
- * internally). Proposal: `GET /api/businesses/resolve?name=&city=` →
- * `BusinessCandidate[]`. Until MAIN arbitrates, the shape lives here — NOT
- * in @/types — and is used only by P2.
- */
-export interface BusinessCandidate {
-  place_id: string;
-  cid: string;
-  name: string;
-  address: string;
-  rating: number;
-  reviews_total: number;
-}
+import type { BusinessCandidate } from "@/types";
 
-/** Prototype values: searching "मनोवेध हिप्नोक्लिनिक" + "Karad" → 2 matches. */
+/**
+ * Typed mock of `GET /api/businesses/resolve?name=&city=` (contract row added
+ * 13 Jul — MAIN approved backend's proposal). Prototype values: searching
+ * "मनोवेध हिप्नोक्लिनिक" + "Karad" → 2 matches. Swapped for the real route
+ * on Day 5.
+ */
 export const candidatesMock: BusinessCandidate[] = [
   {
     place_id: "ChIJVVVVVVVVVRQRmanovedh0001",

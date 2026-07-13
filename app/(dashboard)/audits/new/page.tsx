@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { AuditRequest, AuditStage } from "@/types";
+import type { AuditRequest, AuditStage, BusinessCandidate } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
-import {
-  candidatesMock,
-  type BusinessCandidate,
-} from "@/components/mocks/candidates";
+import { candidatesMock } from "@/components/mocks/candidates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -272,9 +269,11 @@ export default function NewAuditPage() {
                       {c.address}
                     </span>
                   </span>
-                  <span className="flex-none font-mono text-[12px] text-ink-soft">
-                    {c.rating.toFixed(1)}★ · {c.reviews_total} reviews
-                  </span>
+                  {c.rating !== null && (
+                    <span className="flex-none font-mono text-[12px] text-ink-soft">
+                      {c.rating.toFixed(1)}★ · {c.reviews_total ?? 0} reviews
+                    </span>
+                  )}
                 </button>
               );
             })}
