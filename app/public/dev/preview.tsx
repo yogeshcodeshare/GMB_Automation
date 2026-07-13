@@ -6,10 +6,12 @@ import { AppStateProvider } from "@/components/shell/app-state";
 import { ToastProvider } from "@/components/ui/toast";
 import DashboardPage from "@/app/(dashboard)/dashboard/page";
 import NewAuditPage from "@/app/(dashboard)/audits/new/page";
+import ReportPage from "@/app/(dashboard)/report/page";
 
 const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p1: { path: "/dashboard", render: () => <DashboardPage /> },
   p2: { path: "/audits/new", render: () => <NewAuditPage /> },
+  p3: { path: "/report", render: () => <ReportPage /> },
 };
 
 /**

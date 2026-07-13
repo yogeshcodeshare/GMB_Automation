@@ -36,6 +36,20 @@ export interface BusinessListItem extends Business {
 }
 
 /**
+ * P1 dashboard KPI aggregates (top strip). All fields derive from existing
+ * tables — no DataForSEO. (Added Day 2, frontend proposal.)
+ */
+export interface DashboardStats {
+  audits_this_week: number;
+  audits_delta: number; // vs last week (+/-)
+  leads_total: number;
+  leads_new_today: number;
+  clients_on_track: number;
+  clients_behind: number;
+  behind_note: string | null; // e.g. "Patil Coaching: posts 6/8 behind"
+}
+
+/**
  * P2 candidate card (New Audit picker). One guarded serp/maps call resolves
  * name+city → the Google matches the founder chooses from before running the
  * paid audit. Not persisted — a lookup result. (Added Day 2, backend proposal.)

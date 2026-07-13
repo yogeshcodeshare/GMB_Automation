@@ -20,6 +20,38 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-13 13:00 IST — main
+**PR #4 (backend M1 pipeline) + PR #5 (frontend P3 report) MERGED → `main` `0a7133f`+.**
+**🎯 M1 EXIT VERIFIED by MAIN:** `tests/manovedh-fixture.test.ts` (13 assertions) passes on
+merged main — score 41 amber, exact rubric 10/0/7/4/5/3/1/2/6/3, phone missing, "Hospital"
+generic, services empty, 12–9 AM hours anomaly, reply 6.67%, 7 posts/293 days, NAP
+mismatch, rented grexa.site, review stats, all six sanity flags, and the EP-002 P3 payload
+assembling. **M1 is DONE.** Full suite: **107 pass / 1 skip**, typecheck ✓ · lint ✓ · build
+✓ (all 8 M1 API routes compile). Both PRs clean ownership.
+- **@frontend contract-proposal `GET /api/dashboard/stats` — APPROVED**, added to
+  API_CONTRACT.md (M1 row) + `DashboardStats` in `@/types`. @backend: build it when
+  convenient (all fields derivable from existing tables, ₹0, no DataForSEO). Low priority.
+- **@frontend** `BusinessCandidate` cleanup landed — thanks. The `/public/dev` route being
+  NODE_ENV-guarded (404 in prod) resolves my earlier concern; keep it till Day-5.
+- **@all — before your next push, `git merge origin/main`.** Both branches are now well
+  behind (main has PR #4+#5 + contract + docs). If a HANDOFF conflict appears, keep BOTH
+  sides' notes newest-first (I just did that here). Or push and I'll reconcile.
+- **@backend** `components/mocks/audit-report.ts` (frontend) is a full typed EP-002
+  `AuditReport` at the M1 values — reuse it as your EP-002 expected-shape reference.
+
+### @main — 2026-07-13 12:35 IST — frontend
+**PR B grew: P3 Audit Report shipped too** (`055eff7`) — Day-2 stretch goal done, not
+just started. Gauge + 10-row rubric (desktop rows / mobile accordions), fixes w/ मराठी–
+English toggle + inline edit, business data (fixture Place ID `ChIJXQL5mR3BwjsRkH4v7VZ9aQY`,
+CID, KG ID, coords), hours w/ 2 anomalies, 27-link pack, WhatsApp modal (send disabled
+till 10 digits), Mark-as-Client flip (+ sprint CTA), Re-audit → P2 auto-run, cap-hit
+'Re-audit paused', non-audited-business dashed empty state, mobile sticky PDF/WhatsApp
+bar. `components/mocks/audit-report.ts` is a full typed EP-002 `AuditReport` carrying the
+M1 acceptance values (41 amber, 10/0/7/4/5/3/1/2/6/3) — backend can reuse it as the
+expected-shape reference for EP-002. Gates: typecheck ✓ · lint ✓ · verified in-browser
+both breakpoints. Day-3 note: P3's inline expandable Website-Audit section (P3b) and P4
+Compare are next per plan; /report currently links to the /website stub.
+
 ### @frontend — 2026-07-13 11:45 IST — main
 **PR #3 MERGED** — app shell + P1 Dashboard + P2 New Audit (frontend @ `5314633`) →
 `main` is now `01234d8`. Reviewed: ownership clean (only `app/(dashboard)`, `app/public`,
@@ -37,8 +69,6 @@ Two Day-3 cleanups (non-blocking):
 2. Tailwind warn at build: `duration-[600ms]` is ambiguous (transition vs animation
    duration) — use the explicit `[transition-duration:600ms]` arbitrary property, or add
    a `transitionDuration` token to the config. Cosmetic.
-Before your next push: `git merge origin/main` (you're behind — PR #2 dataforseo + PR #1
-score/parser + this note). See the reconcile note below.
 
 ### @all — 2026-07-13 11:35 IST — main
 **PR #2 MERGED** — `dataforseo.service` (backend @ `84c58c7`) → `main` is now `e29102d`.
@@ -46,22 +76,25 @@ Reviewed: all 6 §2.6 endpoints route through `SpendGuard.guarded()` (constraint
 free `task_get` polling correctly outside the guard; `{preview:true}` overloads return
 `CostPreview` with no network/ledger hit; creds never logged. Gates green
 (typecheck ✓ · lint ✓ · vitest **78 pass / 1 skip** ✓ · build ✓).
-
-**@backend @frontend — ACTION before your next push:** `main` advanced while you were both
-mid-edit, so your branches are behind. I did **not** touch your worktrees (you have
-uncommitted work). Before your next PR, run **`git fetch origin && git merge origin/main`**
-in your worktree to pick up: the contract `resolve` endpoint + `BusinessCandidate` type,
-and (for frontend) the whole `dataforseo.service`. Resolve any trivial conflicts (likely
-only `docs/agents/HANDOFF.md` — append yours above, keep mine) and re-run gates before you
-push. If you'd rather I reconcile at merge time, just push and drop a note — I'll merge
-`origin/main` into your branch for you.
-
 **Minor follow-up (not blocking), @backend:** in `dataforseo/client.ts` `request()`, a 5xx
 retry re-POSTs `task_post`, which could create a duplicate (double-charged) task if the
 first POST actually succeeded server-side before returning 5xx. The ledger only records the
 one settled `task.cost`, so the cap math stays honest, but real vendor spend could double
-on that rare path. Consider making `task_post` non-retried (or idempotency-keyed) in M2
-when grids fan out. Filed as a note, not a merge blocker.
+on that rare path. Consider making `task_post` non-retried (or idempotency-keyed) in M2.
+
+### @main — 2026-07-13 11:25 IST — frontend
+**PR review request ×2** (gh CLI not installed — push + note per the Day-2 workflow).
+- **PR A = `d04183d` (shell + P1):** app shell (230px sidebar, 58px topbar, business
+  switcher, spend pill on typed EP-012 mock, global cap-hit banner, mobile drawer <920px) ·
+  P1 Dashboard (KPI cards, businesses table w/ Devanagari ellipsis+tooltip, filters,
+  loading/error/empty states) · component recipes in `components/ui` · typed mocks.
+- **PR B = `5314633` + follow-up (P2 New Audit):** search → candidate cards → no-results →
+  manual Place ID/CID → options → live ₹ cost preview → staged 6-stage run → /report.
+- **Your 11:20 note actioned:** P2 picker + mock use `BusinessCandidate` from `@/types`.
+2. **P1 KPI aggregates** have no contract endpoint — contract-proposal:
+   `GET /api/dashboard/stats` → `{ audits_this_week, audits_delta, leads_total,
+   leads_new_today, clients_on_track, clients_behind, behind_note }` (derivable, ₹0).
+   *(→ APPROVED 13:00, see top.)*
 
 ### @all — 2026-07-13 11:20 IST — main
 **PR #1 MERGED** into `main` (backend @ `c1ff9e4`). Reviewed: gates green locally

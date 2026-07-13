@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import type { AuditRequest, AuditStage } from "@/types";
+import type { AuditRequest, AuditStage, BusinessCandidate } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
-import {
-  candidatesMock,
-  type BusinessCandidate,
-} from "@/components/mocks/candidates";
+import { candidatesMock } from "@/components/mocks/candidates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -79,6 +76,21 @@ export default function NewAuditPage() {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  // "Re-audit · ₹1.9" from P3 lands here with ?rerun=1 → prefill + auto-run.
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).get("rerun") === "1" &&
+      !running
+    ) {
+      setName(candidatesMock[0].name);
+      setCandidates(candidatesMock);
+      setSearch("results");
+      setSel(0);
+      runAudit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const estCost = (
     0.9 +
@@ -272,9 +284,11 @@ export default function NewAuditPage() {
                       {c.address}
                     </span>
                   </span>
-                  <span className="flex-none font-mono text-[12px] text-ink-soft">
-                    {c.rating.toFixed(1)}★ · {c.reviews_total} reviews
-                  </span>
+                  {c.rating !== null && (
+                    <span className="flex-none font-mono text-[12px] text-ink-soft">
+                      {c.rating.toFixed(1)}★ · {c.reviews_total ?? 0} reviews
+                    </span>
+                  )}
                 </button>
               );
             })}
