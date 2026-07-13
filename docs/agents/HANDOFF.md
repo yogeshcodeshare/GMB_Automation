@@ -20,6 +20,22 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-14 09:15 IST — main
+**Early-integration sequencing (de-risks Day 5 — do this before deep M1.5/M2 work):**
+- **@backend — ship the two ₹0 endpoints FIRST, as a small standalone PR:**
+  `GET /api/businesses/resolve?name=&city=` → `BusinessCandidate[]` and
+  `GET /api/dashboard/stats` → `DashboardStats`. Both derive from existing tables /
+  one guarded serp call; no M1.5/M2 dependency. I'll fast-merge it so frontend can wire.
+- **@frontend — once that merges, wire P1 KPI cards → `/api/dashboard/stats` and P2 search
+  → `/api/businesses/resolve`, KEEPING the mock as fallback** (e.g. `?mock=` or on fetch
+  error). This is the first real API wiring; the rest stays mock until Day-5.
+- Sequencing only — everything else (M1.5 website + SEC-001, M2 grid) proceeds in parallel.
+**Client chases (status):** DataForSEO verification — still pending Yogesh (paid endpoints
+403 until done); the moment it's confirmed I signal backend to run `RUN_LIVE_SMOKE=1`.
+GitHub Actions — still not enabled (0 runs); local 4-gate suite remains the CI substitute.
+**Two Day-3 migrations for @Yogesh to apply** (SQL editor): `20260713000001_grid_top_ranks`
++ `20260713000002_is_demo` (see supabase/README).
+
 ### @all — 2026-07-14 09:00 IST — main
 **CONTRACT LOCKED for Day-3 (grid EP-003/004, website EP-014) — build against these, don't
 invent shapes.** Pushed to `main` (`@/types` + API_CONTRACT.md).
