@@ -47,4 +47,36 @@ describe("MVP gate — fixture audit → Marathi PDF", () => {
     expect(text).toContain("कॅटेगरी"); // a Marathi fix line
     expect(text).not.toContain("<script"); // belt over the SEC-003 braces
   }, 120_000);
+
+  it("CR-2: the Manovedh fixture fits EXACTLY one A4 page", async (ctx) => {
+    if (!(await chromiumAvailable())) return ctx.skip();
+    process.env.FEATURE_PDF = "on";
+    const pdf = await renderPdf(renderReportHtml(manovedhReport(), "mr"));
+    const { PDFParse } = await import("pdf-parse");
+    const { total } = await new PDFParse({ data: new Uint8Array(pdf) }).getText();
+    expect(total).toBe(1);
+  }, 120_000);
+
+  it("CR-2: synthetic long detail flows to page 2 at most", async (ctx) => {
+    if (!(await chromiumAvailable())) return ctx.skip();
+    process.env.FEATURE_PDF = "on";
+    const long = manovedhReport((input) => {
+      // long-detail scenario: a pile of verbose findings
+      for (let i = 0; i < 30; i++) {
+        input.profile.services.push(
+          `Extra documented service line number ${i} with a fairly long description attached to it`
+        );
+      }
+    });
+    long.sanity_flags = Array.from({ length: 28 }, (_, i) => ({
+      key: "nap_mismatch" as const,
+      severity: "warn" as const,
+      message: `Synthetic long finding ${i}: `.padEnd(90, "x"),
+    }));
+    const pdf = await renderPdf(renderReportHtml(long, "en"));
+    const { PDFParse } = await import("pdf-parse");
+    const { total } = await new PDFParse({ data: new Uint8Array(pdf) }).getText();
+    expect(total).toBeGreaterThanOrEqual(2); // overflow exists…
+    expect(total).toBeLessThanOrEqual(2); // …and stops at page 2
+  }, 120_000);
 });

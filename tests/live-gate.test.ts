@@ -7,6 +7,11 @@ import {
   readLiveDataFlag,
   setLiveDataFlag,
 } from "@/server/settings/live-flag";
+import {
+  patchSettings,
+  readSettings,
+  validateSettingsPatch,
+} from "@/server/settings/store";
 import { errFrom } from "@/server/http";
 import { startGridScan } from "@/server/grid/engine";
 import { GRID_TABLES, miniDb } from "./helpers/mini-db";
@@ -120,6 +125,77 @@ describe("CR-1 — settings flag storage (default OFF)", () => {
     expect(await readLiveDataFlag(client)).toBe(false);
     await setLiveDataFlag(client, true);
     expect(await readLiveDataFlag(client)).toBe(true);
+  });
+});
+
+describe("settings store — full Settings read/patch (contract: Settings / Partial<Settings>)", () => {
+  it("readSettings returns the full row; defaults when absent", async () => {
+    const { client, tables } = miniDb(["settings"]);
+    expect(await readSettings(client)).toMatchObject({
+      daily_spend_cap_usd: 1,
+      public_daily_limit: 50,
+      per_ip_limit: 3,
+      model_chain: [],
+      dataforseo_live_enabled: false,
+    });
+    tables.settings.push({
+      id: 1,
+      daily_spend_cap_usd: 2.5,
+      public_daily_limit: 40,
+      per_ip_limit: 5,
+      model_chain: ["groq/x"],
+      dataforseo_live_enabled: true,
+    });
+    const s = await readSettings(client);
+    expect(s.daily_spend_cap_usd).toBe(2.5);
+    expect(s.model_chain).toEqual(["groq/x"]);
+    expect(s.dataforseo_live_enabled).toBe(true);
+  });
+
+  it("patchSettings updates ONLY present keys and returns the full row", async () => {
+    const { client, tables } = miniDb(["settings"]);
+    tables.settings.push({
+      id: 1, daily_spend_cap_usd: 1, public_daily_limit: 50, per_ip_limit: 3,
+      model_chain: ["a"], dataforseo_live_enabled: false,
+    });
+    const after = await patchSettings(client, { daily_spend_cap_usd: 3 });
+    expect(after.daily_spend_cap_usd).toBe(3);
+    expect(after.public_daily_limit).toBe(50); // untouched
+    expect(after.model_chain).toEqual(["a"]); // untouched
+    expect(after.dataforseo_live_enabled).toBe(false); // untouched
+  });
+
+  it("validateSettingsPatch: the review's exact case { daily_spend_cap_usd: 3 } is VALID", () => {
+    const parsed = validateSettingsPatch({ daily_spend_cap_usd: 3 });
+    expect(parsed).toEqual({ daily_spend_cap_usd: 3 });
+  });
+
+  it("validateSettingsPatch: per-field bounds + empty rejection", () => {
+    expect(validateSettingsPatch({ dataforseo_live_enabled: true })).toEqual({
+      dataforseo_live_enabled: true,
+    });
+    expect(typeof validateSettingsPatch({ dataforseo_live_enabled: "yes" })).toBe("string");
+    expect(typeof validateSettingsPatch({ daily_spend_cap_usd: -1 })).toBe("string");
+    expect(typeof validateSettingsPatch({ daily_spend_cap_usd: 100000 })).toBe("string");
+    expect(typeof validateSettingsPatch({ public_daily_limit: 1.5 })).toBe("string");
+    expect(typeof validateSettingsPatch({ per_ip_limit: -3 })).toBe("string");
+    expect(typeof validateSettingsPatch({ model_chain: ["ok", ""] })).toBe("string");
+    expect(typeof validateSettingsPatch({ model_chain: "notarray" })).toBe("string");
+    expect(typeof validateSettingsPatch({})).toBe("string"); // nothing to update
+    expect(typeof validateSettingsPatch({ unknown_key: 1 })).toBe("string"); // no known key
+  });
+
+  it("validateSettingsPatch: multi-field patch keeps all valid keys, rounds cap to 2dp", () => {
+    const parsed = validateSettingsPatch({
+      daily_spend_cap_usd: 2.559,
+      model_chain: ["groq/llama"],
+      dataforseo_live_enabled: true,
+    });
+    expect(parsed).toEqual({
+      daily_spend_cap_usd: 2.56,
+      model_chain: ["groq/llama"],
+      dataforseo_live_enabled: true,
+    });
   });
 });
 

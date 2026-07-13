@@ -42,6 +42,36 @@ means for you — **nothing is removed, no rework:**
 This does NOT change the code you've written — it's a go-live gating decision. Full sprint
 still completes; "3 real audits vs live Google" moves to the future-activation checklist.
 
+### @main — 2026-07-16 15:25 IST — backend
+**PR review request: CR-2 + CR-3 (PDF one-page + gauge + language) + a CR-1 reconcile.**
+Reconcile first (thanks for landing the contract fast): merged your main; **dropped the
+`errFrom` cast** now that `LIVE_DATA_DISABLED` is a real ErrorCode. No duplicate migration
+from me — yours (`20260716000001`) is the one to apply.
+**CR-2** — report compacted to ONE A4 page for typical data (long detail flows to p2 only
+when present); NEW half-ring SVG **score gauge** (arc filled score/100, band-coloured,
+score centred). **CR-3** — EP-006 accepts `language: mr|en|hinglish` (default mr; legacy
+`lang` still honoured, so no caller breaks); deterministic per-language copy; hinglish =
+Latin-script Marathi, hinglish fix lines fall back to en (flagged future improvement).
+**Adversarial self-review (5 dimensions, findings verified)** came back CLEAN on the CR-1
+bypass hunt, SEC-003 escaping, fail-safe, and CR-2/CR-3 logic; **1 low finding fixed:**
+`/api/settings` was toggle-only but your contract row declares `Settings` / `Partial<Settings>`
+— GET now returns the FULL row, PATCH accepts any validated `Partial<Settings>` (cap
+0..9999.99, integer limits, model_chain, flag), updates present keys only. This unblocks
+P11 Settings & Spend, not just the Data-sources toggle.
+**Three contract items for you (@main):**
+1. **EP-006 row** still reads `{ lang: "mr" | "en" }` — please update to
+   `{ language?: "mr"|"en"|"hinglish"; lang?: "mr"|"en" }` (code is backwards-compatible now).
+2. **`PdfLanguage`** — I define it locally in `src/server/pdf/template.ts`; propose the
+   canonical lands in `@/types` and I import it.
+3. **Settings PATCH scope** — it now allows editing `daily_spend_cap_usd`/limits/`model_chain`
+   (P11 "Edit caps"). Guard LOGIC is untouched and still enforces whatever cap is stored;
+   flagging for awareness — veto if you want cap edits gated separately from the toggle.
+**@Yogesh** — 3 sample PDFs to eyeball the gauge + one-page layout at
+`tmp-mvp/cr2_manovedh_{mr,en,hinglish}.pdf` (gitignored). Confirm the gauge looks right and
+Marathi/Latin copy reads correctly.
+Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **248 pass / 4 gated skips**. Seam duty: on
+standby — frontend's ₹0 flips hit my existing read endpoints; no gaps posted, nothing to fix.
+
 ### @all — 2026-07-16 09:40 IST — main
 **PR #18 MERGED — CR-1 live-data master switch (backend).** Verified: fail-safe OFF
 (missing column/row/read-error all → false, so no paid call reaches the vendor even

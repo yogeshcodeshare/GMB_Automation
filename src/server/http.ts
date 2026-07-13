@@ -46,15 +46,7 @@ export function err(
 export function errFrom(e: unknown): NextResponse {
   if (e instanceof SpendCapError) return err(e.code, e.message);
   if (e instanceof FeatureDisabledError) return err(e.code, e.message);
-  if (e instanceof LiveDataDisabledError) {
-    // CR-1: "LIVE_DATA_DISABLED" is a contract-proposal ErrorCode addition
-    // (503 like FEATURE_DISABLED); emitted verbatim until MAIN lands it.
-    const body: ApiResponse<never> = {
-      ok: false,
-      error: { code: e.code as unknown as ErrorCode, message: e.message },
-    };
-    return NextResponse.json(body, { status: 503 });
-  }
+  if (e instanceof LiveDataDisabledError) return err(e.code, e.message);
   if (e instanceof DfsConfigError) return err(e.code, e.message);
   if (e instanceof DfsTimeoutError) return err(e.code, e.message);
   if (e instanceof DfsUpstreamError) return err(e.code, e.message);
