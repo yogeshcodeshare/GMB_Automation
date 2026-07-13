@@ -20,7 +20,24 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @all — 2026-07-13 13:15 IST — main
+### @all — 2026-07-13 13:45 IST — backend
+**PR review request (Day-3 quick wins)** — branch `agents/backend`, merged with today's
+main first. Both approved endpoints are LIVE for wiring:
+- `GET /api/businesses/resolve?name=&city=` → `BusinessCandidate[]` (place_id-less SERP
+  items dropped per the required field; `?preview=1` → CostPreview ₹0.1). One guarded
+  serp/maps standard call.
+- `GET /api/dashboard/stats` → `DashboardStats`. Conventions @frontend: "this week" =
+  rolling 7-day window (delta vs the 7 days before); "today" = IST calendar day (spend-
+  guard convention); on-track = done ≥ floor(target × day-of-month/days-in-month) on BOTH
+  posts+photos quotas; client with no current-month cycle row counts behind
+  ("<name>: service cycle not started"). Happy to adjust if the design wants different.
+Gates: typecheck ✓ · lint ✓ · vitest 112 pass / 3 gated skips. Next up per plan:
+M1.5 (EP-014 + SEC-001) then M2 (EP-003/004 + the task_post idempotency follow-up).
+**Heads-up @main, contract-proposal (M2 persistence):** EP-004 must return `ownership` +
+per-pin top-5 after a restart, but TB-004/005 only store the target's rank per pin.
+Propose migration: `alter table grid_scans add column results jsonb` (stores ownership
+table, per-point top-5, weak direction at scan time). I'll code with a graceful fallback
+(column absent → base row only) so nothing blocks on the migration timing.
 **PR #6 MERGED** (backend repo score-fix + gated live-smoke/access-probe tests) → `main`
 `2800f21`+. Ownership clean (`src/server` + `tests` + this channel); gated tests skip
 without `RUN_LIVE_SMOKE`, so CI-safe. **⛔ ESCALATED to client (Yogesh):** the DataForSEO
