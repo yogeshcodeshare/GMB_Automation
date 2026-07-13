@@ -20,6 +20,38 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-17 19:30 IST — backend
+**Two PR review requests (Day 6): ① fixes + M6 sprint engine · ② P9 reads.**
+**① Quick fixes + M6 (EP-021/022, MANUAL mode)** — commits `aacba88` + `3088afa`:
+- Your 3 fix-list items done: `liveGate` REQUIRED (compiler-enforced everywhere),
+  stale errors.ts comment gone, flag read TTL-cached (25 gate calls = 1 settings read,
+  tested; flip takes effect ≤5s). Bonus seam fix: EP-005 now accepts tone `festive`
+  (the route would have 400'd the new contract value).
+- EP-021: server-side US-024 gate with per-reason `details.reasons` (6-case test
+  matrix) · baseline LOCKS at create, immutable (tamper-rejection + survives-completion
+  tests) · one active sprint per business · grouped ~23-task catalog from the locked
+  audit snapshot with **manual-mode payload per task: `copy_value` + `google_editor_url`**
+  (kgmid edit surface / writereview / directory URLs) · AI prefills for description +
+  post via ai.service, `approved=false`, best-effort (model failure never blocks).
+- EP-022: baseline-vs-current comparison (mid-sprint → baseline + note), rubric deltas,
+  field changes, work log; SEC-003-escaped before/after HTML with two gauges; PDF behind
+  FEATURE_PDF; WA `sent:false` while keys pending.
+- **Zero vendor calls proven twice:** import-level test + full engine run with
+  `globalThis.fetch` POISONED (0 network calls).
+- **Contract items @main:** (a) additive `manual_links` map on the SprintDetail response
+  (per-task manual-mode payload — additive-optional per the versioning rule; formalise
+  in @/types when convenient); (b) additive `GET /api/sprint/:id` (P12 needs a read;
+  POST/PATCH already return SprintDetail).
+**② P9 reads** — commit `26ad839`: `GET /api/ops/cycles?month=YYYY-MM` → per-client
+cycle + checklist + month counts (reviews/posts/requests/media-pending/pending-replies)
++ sprint work-log; `GET /api/ops/today` → `TodaysWorkItem[]` (all 5 kinds:
+publish_photo, pending_reply, post_due, report_due in the last-5-days window,
+review_request_reminder >3d). Both ₹0 DB reads. **contract-proposal:** add the two rows
+(response shapes in `src/server/ops/reads.ts`; `TodaysWorkItem` already in @/types).
+Gates: typecheck ✓ · lint ✓ · build ✓ (6 new routes) · vitest **282 pass / 5 gated
+skips** (28 new today). Seam duty: no frontend gaps posted; settings PATCH field-name
+fix + migration remain on the frontend/client side per your 09:10 note.
+
 ### @all — 2026-07-17 09:10 IST — main
 **Authed live-read walk DONE — but the two remaining flips are BLOCKED, not deferred.
 Findings + evidence in `docs/agents/DAY6_INTEGRATION.md`. Do NOT flip `/api/settings` or
