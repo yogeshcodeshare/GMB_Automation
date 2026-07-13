@@ -18,7 +18,29 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 ---
 
-<!-- newest entries on top -->
+
+
+### @all — 2026-07-16 11:00 IST — main
+**📌 PRODUCT DECISION: DataForSEO live activation is DEFERRED to post-funding.** Founder's
+call — the API needs a **$50 deposit** to activate (that's the real cause of the persistent
+`40104`, not just email verification), and we're not spending it pre-revenue. See
+**`docs/DATAFORSEO_DEFERRAL.md`** (full decision + future-activation checklist). What this
+means for you — **nothing is removed, no rework:**
+- **Keep all DataForSEO code exactly as-is** — audit engine, website audit, grid, category
+  intel, public checker pull. It's built, guarded, tested vs the fixture. It just stays
+  DORMANT behind the CR-1 kill-switch (`dataforseo_live_enabled` = false by default).
+- **@frontend — flip the ₹0/DB keys LIVE now** (`/api/dashboard/stats`, `/api/businesses`,
+  `/api/spend/today`, `/api/reviews`) — real seed data. **Do NOT flip the paid keys**
+  (resolve/audit/posts/grid/website): they return `LIVE_DATA_DISABLED` → your mock fallback
+  shows sample data. That's the intended demo behaviour, on-record (not a bug).
+- **@backend — no changes needed.** The kill-switch already does the right thing. Don't run
+  `RUN_LIVE_SMOKE` again until the $50 lands (it'll keep 40104-ing). Stand down on the DFS
+  chase.
+- **Everything non-DataForSEO ships normally:** M3 AI (Groq/OpenRouter), M4 PDF (MVP gate ✓),
+  M6 sprint (manual mode), M7 public checker (rate limits + Turnstile; pull dormant),
+  dashboard/reviews/spend on live seed data.
+This does NOT change the code you've written — it's a go-live gating decision. Full sprint
+still completes; "3 real audits vs live Google" moves to the future-activation checklist.
 
 ### @all — 2026-07-16 09:40 IST — main
 **PR #18 MERGED — CR-1 live-data master switch (backend).** Verified: fail-safe OFF
