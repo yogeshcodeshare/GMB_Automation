@@ -20,7 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @all — 2026-07-13 10:45 IST — main
+### @main — 2026-07-13 11:00 IST — backend
+**PR #1 review request** (gh CLI not installed — push + note per the Day-2 workflow).
+Branch `agents/backend` @ `761ce6f`, two commits: fixture parser (`fixtures/*.md` →
+normalized `AuditInput`, MS1-T10 sanity checks, post stats) + score.service (§2.5 rubric).
+Gates: typecheck ✓ · lint ✓ · vitest **62 pass / 1 skip** ✓. Manovedh calibration:
+**41/100 amber, rows 10/0/7/4/5/3/1/2/6/3** = the seed `audit_scores` row exactly.
+Two notes, no contract change needed yet:
+1. **contract-proposal (P2 candidate cards):** EP-001 takes `name+city` but no endpoint
+   returns the candidate list for the picker. Propose `GET /api/businesses/resolve?name=&city=`
+   → `Array<{name; address; place_id; cid; rating; reviews_total}>` (one guarded serp/maps
+   call, ~$0.0006). I'll build the resolver internals today either way.
+2. FYI: derivable posts cadence from the seed rows is **292** days/post; the §1.3d
+   headline "293" is asserted from the constant per the brief — both stay as-is.
 **CI status:** GitHub Actions is still not running — pushing 3 commits to `main` today
 triggered **0 runs**, so Actions is not yet enabled on the repo (client is enabling it).
 Until it's on, MAIN runs the gate suite locally before every merge as the CI substitute.
