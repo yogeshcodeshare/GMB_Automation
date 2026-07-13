@@ -176,15 +176,23 @@ interface AuditJoinRow {
   audit_scores: { total: number } | Array<{ total: number }> | null;
 }
 
-function latestScore(row: AuditJoinRow | undefined): {
-  score: number | null;
-  at: string | null;
-} {
-  if (!row) return { score: null, at: null };
+function rowScore(row: AuditJoinRow): number | null {
   const scores = Array.isArray(row.audit_scores)
     ? row.audit_scores[0]
     : row.audit_scores;
-  return { score: scores?.total ?? null, at: row.created_at };
+  return scores?.total ?? null;
+}
+
+/** Newest audit that actually finished scoring — a failed/running audit
+ * must not blank the dashboard score badge. */
+function latestScore(rows: AuditJoinRow[]): {
+  score: number | null;
+  at: string | null;
+} {
+  const scored = rows.find((r) => rowScore(r) !== null);
+  if (scored) return { score: rowScore(scored), at: scored.created_at };
+  const newest = rows[0];
+  return { score: null, at: newest?.created_at ?? null };
 }
 
 export async function listBusinesses(
@@ -195,12 +203,12 @@ export async function listBusinesses(
     .select("*, audits(id, created_at, audit_scores(total))")
     .order("created_at", { ascending: true })
     .order("created_at", { referencedTable: "audits", ascending: false })
-    .limit(1, { referencedTable: "audits" });
+    .limit(5, { referencedTable: "audits" });
   if (error) fail("businesses list", error.message);
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const audits = (row.audits ?? []) as AuditJoinRow[];
-    const latest = latestScore(audits[0]);
+    const latest = latestScore(audits);
     const { audits: _drop, ...business } = row;
     return {
       ...(business as unknown as Business),
