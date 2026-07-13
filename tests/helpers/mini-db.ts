@@ -13,9 +13,12 @@ export class MiniQuery {
   private conflictKeys: string[] | null = null;
   private orderBy: { col: string; ascending: boolean } | null = null;
 
+  private wantCount = false;
+
   constructor(private table: Row[], private genId: () => string) {}
 
-  select(_cols?: string) {
+  select(_cols?: string, opts?: { count?: string; head?: boolean }) {
+    if (opts?.count) this.wantCount = true;
     return this;
   }
   insert(payload: Row | Row[]) {
@@ -71,6 +74,7 @@ export class MiniQuery {
   private execute(): {
     data: unknown;
     error: { code?: string; message: string } | null;
+    count?: number;
   } {
     if (this.op === "select") {
       let rows = this.table.filter((r) => this.matches(r));
@@ -82,7 +86,11 @@ export class MiniQuery {
           return ascending ? av.localeCompare(bv) : bv.localeCompare(av);
         });
       }
-      return { data: this.wantSingle ? (rows[0] ?? null) : rows, error: null };
+      return {
+        data: this.wantSingle ? (rows[0] ?? null) : rows,
+        error: null,
+        count: this.wantCount ? rows.length : undefined,
+      };
     }
     if (this.op === "insert") {
       const rows = (Array.isArray(this.payload) ? this.payload : [this.payload]) as Row[];
@@ -120,7 +128,9 @@ export class MiniQuery {
     return { data: null, error: null };
   }
 
-  then<T>(resolve: (v: { data: unknown; error: unknown }) => T): Promise<T> {
+  then<T>(
+    resolve: (v: { data: unknown; error: unknown; count?: number }) => T
+  ): Promise<T> {
     return Promise.resolve(this.execute()).then(resolve);
   }
 }

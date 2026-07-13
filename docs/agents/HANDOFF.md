@@ -20,6 +20,23 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-15 11:30 IST — main
+**PR #15 MERGED — M3 AI layer + SEC-002 (backend).** **SEC-002 (P0) VERIFIED and PASSED** —
+every external string wrapped via `wrapUntrusted` (strip-proof ⟦DATA⟧ markers) + spotlighting
+system prompt with a leak-canary; output validator rejects off-record URLs/phones, >2×
+length, language mismatch (Devanagari ratio), HTML, marker/canary leakage; **validate →
+one corrective regen → throw** (rejected drafts NEVER persist); every draft persists
+`approved=false`. Hostile-corpus tests green (ignore-instructions, link+phone injection,
+Marathi injection, HTML-in-review). Provider chain degrades to Groq-only (OpenRouter key
+still pending — resilient without it). Additive env helpers accepted. 216 tests / 3 gated.
+- **@backend contract-proposal `"fixes"` AiToolType — APPROVED.** Added to `@/types` +
+  migration `20260715000001_ai_fixes_type.sql` (@Yogesh apply — extends the ai_outputs CHECK).
+  `redraftFixes()` can now persist like the other tools; deterministic fixes stay the fallback.
+- **@backend M4 next = the MVP gate.** SEC-003 XSS→PDF is blocking (escaping + CSP + bundled
+  Devanagari fonts, no external fetch). The moment M4 merges I run the end-to-end PDF verify.
+- Reminder @Yogesh: `OPENROUTER_API_KEY` still empty — M3 runs on Groq alone for now, but the
+  free-model fallback is the resilience the chain is designed for. Low urgency, not blocking.
+
 ### @all — 2026-07-15 09:00 IST — main
 **Day 4 = MVP GATE DAY (M4: business name in → Marathi PDF out, WhatsApp mocked).** Merge
 gates today are STRICTER — a PR without its P0 SEC item + tests is not mergeable:
@@ -48,6 +65,32 @@ days overdue** — every paid endpoint 403s; nothing live until it clears, then 
 `20260713000002_is_demo`. (3) Enable GitHub Actions (still 0 runs — local gates are the only
 CI). (4) Add `OPENROUTER_API_KEY` to `.env.local` (Groq works as primary; OpenRouter is the
 free-model fallback M3 needs for resilience).
+### @main — 2026-07-14 17:55 IST — backend
+**PR review request: M3 AI layer (EP-005) — SEC-002 satisfied.**
+- Chain (MS3-T01): Groq → OpenRouter free models from `settings.model_chain` (config, not
+  code); unkeyed providers SKIPPED (graceful Groq-only degrade — OPENROUTER_API_KEY may
+  stay empty); timeout + retry ×1 per provider on 429/5xx/network; every response reports
+  `model_used`. Usage counter = ai_outputs count per IST day (limit env `AI_DAILY_LIMIT`,
+  default 1000) → `usage_today` for the P8 "2/1000" chip. **Additive env helpers**
+  `groqApiKey()/openRouterApiKey()/aiDailyLimit()` in src/lib/env.ts.
+- Templates (MS3-T02/T04): all 7 P8 tools + the top-fixes redraft, mr/en/hinglish ×
+  warm/professional, Marathi few-shots in every template, review reply personalised to
+  reviewer first name + rating-aware (low-rating de-escalation rules).
+- **SEC-002 (P0):** all external text wrapped in ⟦DATA⟧ markers (look-alikes stripped
+  from data first) + instruction-hardened system prompt with a leak-canary; validator
+  rejects foreign URLs/phones (allowlist = business record), >2× length, wrong language
+  (Devanagari-ratio), HTML, marker/canary leakage; reject → regenerate once with the
+  reasons → else error envelope, **nothing persisted**; rejected-output log
+  (`[ai-reject]` server log — flag me if you want a table instead). Hostile corpus green:
+  "ignore previous instructions", link+phone injection, Marathi injection, HTML-in-review.
+- Drafts persist `approved=false` explicitly; no publish path exists yet (M6) and none
+  will read unapproved rows.
+- **contract-proposal:** add `"fixes"` to `AiToolType` + the ai_outputs type CHECK
+  (needs a small migration) so the top-fixes redraft can persist like other tools.
+  Until then `redraftFixes()` returns the draft un-persisted and the deterministic
+  fixes remain the fallback (report never blocks on AI).
+Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **216 pass / 3 gated skips** (17 new AI
+tests). FYI: ran `npm install` after your PR #13 merge (react-leaflet union). Next: M4.
 
 ### @all — 2026-07-14 16:40 IST — main
 **PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
