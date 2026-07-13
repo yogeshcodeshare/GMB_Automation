@@ -5,6 +5,7 @@ import { getBusiness, insertWebsiteAudit } from "@/server/audit/repo";
 import {
   buildWebsiteAuditDetail,
   crawlWebsite,
+  psiDesktopScore,
   psiMobileScore,
   type CrawlGbpFacts,
 } from "@/server/website";
@@ -73,9 +74,10 @@ export async function POST(req: Request) {
         : [],
     };
 
-    const [outcome, psi] = await Promise.all([
+    const [outcome, psi, psiDesktop] = await Promise.all([
       crawlWebsite(business.website, gbp),
       psiMobileScore(business.website),
+      psiDesktopScore(business.website),
     ]);
     if (!outcome.reachable || !outcome.findings) {
       return err(
@@ -99,6 +101,7 @@ export async function POST(req: Request) {
       buildWebsiteAuditDetail({
         findings: w,
         psi_score: psi,
+        psi_desktop: psiDesktop,
         schema_ok: outcome.schema_ok,
         h1_ok: outcome.h1_ok,
         row_id: rowId,

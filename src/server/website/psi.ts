@@ -7,20 +7,23 @@ import { psiApiKey } from "@/lib/env";
 const PSI_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
 const PSI_TIMEOUT_MS = 60_000; // PSI runs a real Lighthouse pass — it is slow.
 
-export async function psiMobileScore(
+export interface PsiOpts {
+  apiKey?: string | null;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+export async function psiScore(
   url: string,
-  opts: {
-    apiKey?: string | null;
-    fetchImpl?: typeof fetch;
-    timeoutMs?: number;
-  } = {}
+  strategy: "mobile" | "desktop",
+  opts: PsiOpts = {}
 ): Promise<number | null> {
   const key = opts.apiKey === undefined ? psiApiKey() : opts.apiKey;
   if (!key) return null; // no key configured — skip silently, field is nullable
   const doFetch = opts.fetchImpl ?? fetch;
   const params = new URLSearchParams({
     url,
-    strategy: "mobile",
+    strategy,
     category: "performance",
     key,
   });
@@ -38,4 +41,14 @@ export async function psiMobileScore(
   } catch {
     return null;
   }
+}
+
+/** P3b mobile gauge (also the score.service input). */
+export function psiMobileScore(url: string, opts: PsiOpts = {}): Promise<number | null> {
+  return psiScore(url, "mobile", opts);
+}
+
+/** P3b desktop gauge (WebsiteAuditSummary.psi_desktop, optional). */
+export function psiDesktopScore(url: string, opts: PsiOpts = {}): Promise<number | null> {
+  return psiScore(url, "desktop", opts);
 }

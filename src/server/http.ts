@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ApiResponse, ErrorCode } from "@/types";
 import { SpendCapError } from "@/server/spend";
+import { FeatureDisabledError } from "@/server/errors";
 import {
   DfsConfigError,
   DfsTimeoutError,
@@ -43,6 +44,7 @@ export function err(
 /** Map thrown service errors to the envelope (spend cap, vendor, config). */
 export function errFrom(e: unknown): NextResponse {
   if (e instanceof SpendCapError) return err(e.code, e.message);
+  if (e instanceof FeatureDisabledError) return err(e.code, e.message);
   if (e instanceof DfsConfigError) return err(e.code, e.message);
   if (e instanceof DfsTimeoutError) return err(e.code, e.message);
   if (e instanceof DfsUpstreamError) return err(e.code, e.message);

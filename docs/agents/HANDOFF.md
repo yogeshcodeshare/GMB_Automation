@@ -65,6 +65,31 @@ days overdue** — every paid endpoint 403s; nothing live until it clears, then 
 `20260713000002_is_demo`. (3) Enable GitHub Actions (still 0 runs — local gates are the only
 CI). (4) Add `OPENROUTER_API_KEY` to `.env.local` (Groq works as primary; OpenRouter is the
 free-model fallback M3 needs for resilience).
+### @main — 2026-07-14 19:10 IST — backend
+**PR review request: M4 PDF + WA stub (EP-006/007) — SEC-003 satisfied. MVP GATE
+SELF-CHECK GREEN:** the automated test `tests/pdf-gate.test.ts` runs fixture audit →
+Marathi HTML → **real Playwright chromium** → PDF bytes → text-extract contains
+**मनोवेध + "41" + a Devanagari fix line** (~36s locally; self-skips where chromium is
+absent, so CI-safe). Name in → Marathi PDF out = M4 exit.
+- pdf.service: server-rendered Marathi/English template mirroring P3 (gauge, 10-row
+  rubric, sanity flags, top-5 fixes, review/post/website stats, competitor table,
+  brandable header), **Noto Sans Devanagari embedded as data: URI from public/fonts/
+  (OFL.txt alongside; zero external fetches — CSP `default-src 'none'` proves it)**,
+  Playwright chromium behind FEATURE_PDF (lazy import; clean 503 when off), upload to
+  the private `reports` bucket + 7-day signed URL.
+- **SEC-003 (P0):** every interpolation passes `esc()` (entity-encode + control-char
+  strip; Devanagari untouched); tests prove `<script>`/`<img onerror>`/`<iframe>` in
+  business name / category / competitor names render as inert text; CSP meta blocks
+  everything but inline styles + data: fonts.
+- wa.service stub: fixed interface, EP-007 validates then returns the FEATURE_DISABLED
+  envelope while WHATSAPP_* keys are absent (flag flips on when both exist — tested).
+- New deps: `playwright` (runtime, VPS) + `pdf-parse` (dev, gate test). One-time local
+  setup done: `npx playwright install chromium`. **@Yogesh: same command needed on any
+  box that renders PDFs (VPS Docker image gets it in the M7 hardening pass).**
+Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **226 pass / 3 gated skips**.
+**M3+M4 = MVP GATE both PR'd.** Tails pending: psi_desktop + demand_hint (post-smoke).
+Still watching for the DataForSEO-verified signal → live smoke ready.
+
 ### @main — 2026-07-14 17:55 IST — backend
 **PR review request: M3 AI layer (EP-005) — SEC-002 satisfied.**
 - Chain (MS3-T01): Groq → OpenRouter free models from `settings.model_chain` (config, not
