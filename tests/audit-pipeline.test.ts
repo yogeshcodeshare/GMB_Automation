@@ -1,142 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { DataForSeoClient } from "@/server/dataforseo";
 import { InMemorySpendStore, SpendGuard } from "@/server/spend";
 import { startAudit } from "@/server/audit/pipeline";
 import { getProgress } from "@/server/audit/progress";
+import { AUDIT_TABLES, miniDb, type Row } from "./helpers/mini-db";
 
 /**
  * Wiring test: the full EP-001 pipeline against a mocked vendor and an
  * in-memory PostgREST stub — profile → reviews → posts → competitors →
  * scoring → persistence, ₹0 spent.
  */
-
-// ---------- mini in-memory Supabase stub (only the chains the repo uses) ----------
-
-type Row = Record<string, unknown>;
-
-class MiniQuery {
-  private filters: Array<[string, unknown]> = [];
-  private op: "select" | "insert" | "update" | "upsert" | "delete" = "select";
-  private payload: Row | Row[] | null = null;
-  private wantSingle = false;
-  private conflictKeys: string[] | null = null;
-
-  constructor(private table: Row[], private genId: () => string) {}
-
-  select(_cols?: string) {
-    if (this.op === "select") return this;
-    return this; // insert(...).select() — payload already applied on execute
-  }
-  insert(payload: Row | Row[]) {
-    this.op = "insert";
-    this.payload = payload;
-    return this;
-  }
-  update(payload: Row) {
-    this.op = "update";
-    this.payload = payload;
-    return this;
-  }
-  upsert(payload: Row | Row[], opts?: { onConflict?: string }) {
-    this.op = "upsert";
-    this.payload = payload;
-    this.conflictKeys = opts?.onConflict?.split(",").map((s) => s.trim()) ?? null;
-    return this;
-  }
-  delete() {
-    this.op = "delete";
-    return this;
-  }
-  eq(col: string, value: unknown) {
-    this.filters.push([col, value]);
-    return this;
-  }
-  order() {
-    return this;
-  }
-  limit() {
-    return this;
-  }
-  single() {
-    this.wantSingle = true;
-    return this;
-  }
-  maybeSingle() {
-    this.wantSingle = true;
-    return this;
-  }
-
-  private matches(row: Row): boolean {
-    return this.filters.every(([col, value]) => row[col] === value);
-  }
-
-  private execute(): { data: unknown; error: { code?: string; message: string } | null } {
-    if (this.op === "select") {
-      const rows = this.table.filter((r) => this.matches(r));
-      return { data: this.wantSingle ? (rows[0] ?? null) : rows, error: null };
-    }
-    if (this.op === "insert") {
-      const rows = (Array.isArray(this.payload) ? this.payload : [this.payload]) as Row[];
-      const inserted = rows.map((r) => ({ id: this.genId(), ...r }));
-      this.table.push(...inserted);
-      return { data: this.wantSingle ? inserted[0] : inserted, error: null };
-    }
-    if (this.op === "update") {
-      const rows = this.table.filter((r) => this.matches(r));
-      rows.forEach((r) => Object.assign(r, this.payload));
-      return { data: this.wantSingle ? (rows[0] ?? null) : rows, error: null };
-    }
-    if (this.op === "upsert") {
-      const rows = (Array.isArray(this.payload) ? this.payload : [this.payload]) as Row[];
-      const results: Row[] = [];
-      for (const r of rows) {
-        const keys = this.conflictKeys;
-        const existing = keys
-          ? this.table.find((t) => keys.every((k) => t[k] === r[k] && r[k] != null))
-          : undefined;
-        if (existing) {
-          Object.assign(existing, r);
-          results.push(existing);
-        } else {
-          const inserted = { id: this.genId(), ...r };
-          this.table.push(inserted);
-          results.push(inserted);
-        }
-      }
-      return { data: this.wantSingle ? results[0] : results, error: null };
-    }
-    // delete
-    for (let i = this.table.length - 1; i >= 0; i--) {
-      if (this.matches(this.table[i])) this.table.splice(i, 1);
-    }
-    return { data: null, error: null };
-  }
-
-  then<T>(resolve: (v: { data: unknown; error: unknown }) => T): Promise<T> {
-    return Promise.resolve(this.execute()).then(resolve);
-  }
-}
-
-function miniDb() {
-  let seq = 0;
-  const genId = () =>
-    `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
-  const tables: Record<string, Row[]> = {
-    businesses: [],
-    audits: [],
-    audit_scores: [],
-    reviews_cache: [],
-    posts_cache: [],
-  };
-  const client = {
-    from(name: string) {
-      if (!tables[name]) throw new Error(`mini-db: unknown table ${name}`);
-      return new MiniQuery(tables[name], genId);
-    },
-  };
-  return { client: client as unknown as SupabaseClient, tables };
-}
 
 // ---------- mocked vendor ----------
 
@@ -285,7 +158,7 @@ function mockedDfs() {
 
 describe("EP-001 pipeline (mocked vendor, in-memory db)", () => {
   it("runs all stages, persists scores/reviews/posts, ends done", async () => {
-    const { client, tables } = miniDb();
+    const { client, tables } = miniDb(AUDIT_TABLES);
     const { dfs, store } = mockedDfs();
 
     const started = await startAudit(
@@ -332,7 +205,7 @@ describe("EP-001 pipeline (mocked vendor, in-memory db)", () => {
   });
 
   it("reviews failure degrades to partial, scoring still lands", async () => {
-    const { client, tables } = miniDb();
+    const { client, tables } = miniDb(AUDIT_TABLES);
     const store = new InMemorySpendStore();
     store.dailyCapUsd = 1.0;
     const queue = [

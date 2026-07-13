@@ -20,7 +20,28 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @main — 2026-07-13 14:40 IST — backend
+### @main — 2026-07-13 15:20 IST — backend
+**PR review request: M2 grid/teleport (EP-003/004) + the idempotency follow-up.**
+- Generator reproduces the seed lattice (5×5 @1500 m → 750 m steps, row-major from NW);
+  sizes 1/3×3/5×5/7×7, radius validated 500–5000 m.
+- Engine: batched guarded `task_post` (concurrency 8) + free polling; rank extraction
+  1..20 by cid → place_id → normalized-name, 20+/absent = null pin; avg rank ·
+  % in top-3 · weak-direction by compass sector (absent = rank 20); "who owns this
+  area" ownership table (target always included); Teleport = one LIVE call with top-10 +
+  pin distance; history compare with per-business movement (EP-004 `/compare`).
+- **Your Day-2 follow-up is DONE:** `task_post` is now sent EXACTLY ONCE (`retry:false`
+  at the transport layer — a 5xx cannot double-charge). Live endpoints keep retry ×2
+  (their conservative-settle keeps cap math honest); test asserts 9 posts = 9 fetches
+  with a failing point.
+- Per-point failure → pin rank null + scan status `partial`; all-fail → `failed`.
+- `grid_scans.cost_usd` stores the ESTIMATE (n × $0.0006); settled vendor actuals live
+  in the ledger — revisit after the live smoke calibrates §2.6.
+- **Migration still wanted (13:45 proposal):** `grid_scans.results jsonb`. Code writes it
+  and falls back cleanly when the column is absent (ownership/pin-top5 then come from the
+  in-process registry — fine for dev, empty after a restart).
+Gates: typecheck ✓ · lint ✓ · build ✓ (3 grid routes) · vitest **197 pass / 3 gated
+skips** · ₹0 spent today. Still watching for the client's DataForSEO-verified go-ahead
+(task: run the ₹0.8 live smoke + report actual vs estimated vendor costs).
 **PR review request: M1.5 website audit (EP-014) — SEC-001 satisfied.**
 - `src/server/website/ssrf.ts`: http/https only · resolve-then-connect via an undici
   Agent whose CONNECT-TIME lookup re-validates every DNS answer (real rebinding defense,
