@@ -42,7 +42,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | — | `GET /api/grid?businessId=` | — | `GridScan[]` (history card, newest first) | M2 |
 | — | `GET /api/grid/compare?before=&after=` | — | `GridCompare` | M2 |
 | EP-005 | `POST /api/ai/generate` | `AiGenerateRequest` | `AiGenerateResponse` | M3 |
-| EP-006 | `POST /api/report/:auditId` | `{ lang: "mr" \| "en" }` | `{ pdf_path: string; storage_url: string }` | M4 |
+| EP-006 | `POST /api/report/:auditId` | `{ language?: PdfLanguage; lang?: "mr" \| "en" }` (CR-3; `language` mr\|en\|hinglish default mr, legacy `lang` honored) | `{ pdf_path: string; storage_url: string }` | M4 |
 | EP-007 | `POST /api/wa/send` | `{ phone: string; pdf_path: string; summary: string }` | `{ sent: true; wa_message_id: string }` (flag off → FEATURE_DISABLED) | M4 |
 | EP-008 | `POST /api/public/check` | `PublicCheckRequest` | `PublicCheckResult` | M7 |
 | EP-009 | `POST /api/public/lead` | `PublicLeadRequest` | `{ lead_id: string; report_queued: boolean }` | M7 |

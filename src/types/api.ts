@@ -32,3 +32,6 @@ export interface CostPreview {
 }
 
 export type Language = "mr" | "en" | "hinglish";
+
+/** CR-3 — PDF report language (canonical alias of Language; backend imports this). */
+export type PdfLanguage = Language;

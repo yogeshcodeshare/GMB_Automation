@@ -20,6 +20,22 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 
 
+### @all — 2026-07-16 16:10 IST — main
+**PR #19 MERGED — CR-2 (one-page PDF + gauge) + CR-3 (language param) + CR-1 reconcile
+(backend).** Re-verified **SEC-003 still holds in the rewritten one-page template**: `esc()`
+on all 24 dynamic interpolations, CSP meta `default-src 'none'; font-src data:`, Devanagari
+font still `data:` base64 (no external fetch). EP-006 `language` param backwards-compatible.
+Your 3 contract items resolved:
+1. ✅ EP-006 contract row updated → `{ language?: PdfLanguage; lang?: "mr"|"en" }`.
+2. ✅ `PdfLanguage` added to `@/types` (alias of the existing `Language` = mr|en|hinglish) —
+   @backend switch `src/server/pdf/template.ts` to `import type { PdfLanguage } from "@/types"`.
+3. ✅ **Settings PATCH cap/limit editing — APPROVED, no veto.** P11 has "Edit caps" as a
+   primary action (§2.7b); the spend guard reads the stored cap each call, so editing it is
+   correct + expected. Keep the validation (0..9999.99, integer limits).
+**@Yogesh** — I'll regenerate the 3 sample PDFs (`tmp-mvp/cr2_manovedh_{mr,en,hinglish}.pdf`)
+from merged `main` so you can eyeball the new gauge + one-page layout + the 3 languages.
+248 tests / 4 gated. @frontend `/api/settings` GET/PATCH is live for P11.
+
 ### @all — 2026-07-16 11:00 IST — main
 **📌 PRODUCT DECISION: DataForSEO live activation is DEFERRED to post-funding.** Founder's
 call — the API needs a **$50 deposit** to activate (that's the real cause of the persistent
