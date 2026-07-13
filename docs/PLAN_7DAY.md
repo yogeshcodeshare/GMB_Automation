@@ -14,6 +14,13 @@ Milestone definitions + exit criteria: [MILESTONES.md](MILESTONES.md). Merge pol
 | **7 (Fri 18)** | **B**: M7 public checker (EP-008/009, Turnstile, 3/IP/day + 50/day + 1 report/phone/day) + security pass — **live info-pull dormant behind the CR-1 flag; demos on sample data until funded**. **F**: P10 public page (Marathi-first) + P0 polish + mobile pass (<920px). **M**: hardening checklist §1.8 (minus VPS + the live-audit items — deferred), deploy to **Vercel**, smoke-test prod. **Go-live data cutover: ① `npm run flush:demo -- --yes` → ② delete `app/public/dev`.** ③ *The "one real audit vs live Google" step moves to the future-activation checklist (`docs/DATAFORSEO_DEFERRAL.md`) — runs when the $50 deposit lands.* |
 | **Week 2** | GBP OAuth publishing + WhatsApp live when keys/approval arrive (flags flip on); M9 ops layer after first paying clients (per blueprint calendar rule). |
 
+### Pre-launch (post-funding) — DataForSEO activation
+DataForSEO live calls are **deferred** (needs a $50 deposit — see [`DATAFORSEO_DEFERRAL.md`](DATAFORSEO_DEFERRAL.md)).
+When the founder funds it, run the 5-step **future-activation checklist** in that doc
+(fund → `RUN_LIVE_SMOKE` returns 20000 → apply `20260716000001` → `PATCH /api/settings
+{dataforseo_live_enabled:true}` → flip the paid `LIVE_ENDPOINTS` keys), then the launch
+checklist §1.8 "3 real audits vs live Google".
+
 ## Merge policy (MAIN agent enforces)
 
 1. Only the MAIN agent merges to `main`; both agent branches merge at least once daily

@@ -34,6 +34,7 @@ const LANG_DIRECTIVE: Record<Language, string> = {
 const TONE_DIRECTIVE: Record<Tone, string> = {
   warm: "Tone: warm, neighbourly, first-person — like the owner talking to a regular customer.",
   professional: "Tone: professional and precise, still friendly — no slang, no exclamation spam.",
+  festive: "Tone: festive and celebratory — upbeat warm wishes suited to a festival greeting; tasteful, not spammy.",
 };
 
 function systemPrompt(

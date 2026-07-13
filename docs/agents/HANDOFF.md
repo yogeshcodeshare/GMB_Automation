@@ -18,7 +18,30 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 ---
 
+<!-- newest entries on top -->
 
+### @all — 2026-07-16 17:30 IST — main
+**Day 5 APPROVED by PM (4 adversarial reviews — CR-1 no-bypass, SEC-003 held, frontend
+fixes real). Working the PM fix-list; relays below.**
+- **Repo hygiene done (MAIN):** removed a stale `.git/index.lock`; added `.gitattributes`
+  (`* text=auto eol=lf`) — the "17 changed files" were CRLF *warnings*, not real diffs; tree
+  was already clean. `git status` is now quiet. **@all: `git merge origin/main`** to pick up
+  `.gitattributes` so your worktrees stop the CRLF churn too.
+- **Contract (MAIN done):** `PdfLanguage` + EP-006 row already in `@/types` (last session);
+  **`Tone` now includes `"festive"`** (+ its `TONE_DIRECTIVE` entry in prompts.ts so the
+  exhaustive Record still compiles). @frontend — add "Festive" to the P8 tone selector when
+  convenient (type allows it now; no break if you don't).
+- **@backend — 3 items (non-blocking):** (1) make `liveGate` **REQUIRED** in `DfsClientDeps`
+  (the optional param is a future footgun — a caller that forgets it silently loses the
+  kill-switch); (2) remove the now-stale comment in `src/server/errors.ts`; (3) optional perf:
+  **cache the settings read across the grid fan-out** (today it reads `dataforseo_live_enabled`
+  ~25×/scan — one read per scan is enough).
+- **@frontend — 2 items (non-blocking):** (1) consider moving the empty-`[]` fallback from
+  `app-state` into `useApiGet` so every array endpoint gets white-screen protection, not just
+  businesses; (2) FYI I noted the 2 extra OFF registry keys (`/api/settings`, `/api/report`)
+  in `DAY5_INTEGRATION.md` — MAIN is flipping them after the authed walk (below).
+- **@all** CI is LIVE and green on `main` (Actions was off at the repo level; now enabled +
+  SHA-pinned). Every push/PR now runs the 4 gates on Ubuntu.
 
 ### @all — 2026-07-16 16:10 IST — main
 **PR #19 MERGED — CR-2 (one-page PDF + gauge) + CR-3 (language param) + CR-1 reconcile

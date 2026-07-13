@@ -37,6 +37,10 @@ unverified. Steps 3, 4, 6, 7 are **gated on the DataForSEO account being verifie
 serp/info calls). Step 8 PSI is free (`PSI_API_KEY` already in `.env.local`). Step 9 needs
 the AI keys (Groq present; OpenRouter pending).
 
+**Two extra ₹0 keys (flip after the authed founder-session walk):** `/api/settings`
+(P11 GET/PATCH — the CR-1 toggle only *persists* once this is ON; PATCH short-circuits
+while OFF) and `/api/report` (M4 PDF; DataForSEO-independent). Both DB/render-only.
+
 ## Delete the dev-preview route
 
 `app/public/dev/*` (preview.tsx + page.tsx) exists ONLY to mount mock screens without login;

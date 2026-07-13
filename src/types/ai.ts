@@ -12,7 +12,7 @@ export type AiToolType =
   | "category"
   | "fixes"; // top-fixes AI redraft (M3); persists like other tools (approved=false)
 
-export type Tone = "warm" | "professional";
+export type Tone = "warm" | "professional" | "festive";
 
 export interface AiOutput {
   id: string;
