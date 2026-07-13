@@ -280,11 +280,23 @@ export async function getGridResult(
   if (!loaded) return null;
   const { scan, points, results } = loaded;
 
+  // center = the target business location (map rings + teleport distance line).
+  const { data: biz } = await db
+    .from("businesses")
+    .select("lat, lng")
+    .eq("id", scan.business_id)
+    .maybeSingle();
+  const center = {
+    lat: (biz?.lat as number | null) ?? points[0]?.lat ?? 0,
+    lng: (biz?.lng as number | null) ?? points[0]?.lng ?? 0,
+  };
+
   if (scan.grid_size === 1) {
     const point = points[0] ?? null;
     const detail = results?.points_detail[0];
     const teleport: TeleportResult = {
       scan,
+      center,
       point:
         point ??
         ({ id: 0, scan_id: scan.id, lat: 0, lng: 0, rank: null } as GridPoint),
@@ -294,23 +306,31 @@ export async function getGridResult(
     return teleport;
   }
 
+  // Merge each persisted pin with its computed detail (distance/direction/top5).
+  // top5 is [] when results were lost (registry-only, pre-migration).
+  const toDetail = (p: GridPoint): GridPointDetail => {
+    const d = results?.points_detail.find(
+      (x) => Math.abs(x.lat - p.lat) < 1e-9 && Math.abs(x.lng - p.lng) < 1e-9
+    );
+    return {
+      ...p,
+      distance_km: d?.distance_km ?? 0,
+      direction: d?.direction ?? "center",
+      top5: d?.top5 ?? [],
+    };
+  };
+
   const ranks = points.map((p) => p.rank);
   return {
     scan,
-    points,
+    center,
+    points: points.map(toDetail),
     in_top3_pct: results?.in_top3_pct ?? inTop3Pct(ranks),
     weak_direction:
       results?.weak_direction ??
-      (points.length > 0
-        ? weakDirection(
-            {
-              lat: points.reduce((s, p) => s + p.lat, 0) / points.length,
-              lng: points.reduce((s, p) => s + p.lng, 0) / points.length,
-            },
-            points
-          )
-        : null),
+      (points.length > 0 ? weakDirection(center, points) : null),
     ownership: results?.ownership ?? [],
+    demand_hint: null, // keyword-volume lookup not wired yet (contract allows null)
   } satisfies GridScanResult;
 }
 
