@@ -1,0 +1,21 @@
+# Normalize line endings: store LF in the repo, check out LF everywhere.
+# Stops the "LF will be replaced by CRLF" churn/warnings on this Windows box
+# and keeps `git status` clean across machines.
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.webp   binary
+*.ttf    binary
+*.otf    binary
+*.woff   binary
+*.woff2  binary
+*.pdf    binary
+*.zip    binary
+
+# Lockfile: LF, and mark as generated so diffs collapse in review.
+package-lock.json  text eol=lf  linguist-generated
