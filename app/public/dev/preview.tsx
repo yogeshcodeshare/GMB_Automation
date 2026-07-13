@@ -13,6 +13,7 @@ import ReviewInboxPage from "@/app/(dashboard)/reviews/page";
 import GridPage from "@/app/(dashboard)/grid/page";
 import PostAuditPage from "@/app/(dashboard)/posts/page";
 import AiToolsPage from "@/app/(dashboard)/ai-tools/page";
+import SettingsPage from "@/app/(dashboard)/settings/page";
 
 const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p1: { path: "/dashboard", render: () => <DashboardPage /> },
@@ -24,6 +25,7 @@ const SCREENS: Record<string, { path: string; render: () => JSX.Element }> = {
   p5: { path: "/grid", render: () => <GridPage /> },
   p7: { path: "/posts", render: () => <PostAuditPage /> },
   p8: { path: "/ai-tools", render: () => <AiToolsPage /> },
+  settings: { path: "/settings", render: () => <SettingsPage /> },
 };
 
 /**

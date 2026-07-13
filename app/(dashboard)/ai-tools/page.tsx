@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { AiGenerateRequest, Language } from "@/types";
+import type { AiGenerateRequest, AiGenerateResponse, Language } from "@/types";
+import { apiPost } from "@/components/lib/api";
 import { useAppState } from "@/components/shell/app-state";
 import {
   aiHistoryMock,
@@ -96,6 +97,14 @@ export default function AiToolsPage() {
   const [usage, setUsage] = useState(aiUsageMock.used);
   const [loading, setLoading] = useState(false);
   const [variants, setVariants] = useState<Record<string, 0 | 1>>({});
+  /** Real EP-005 output per tab when the endpoint is live (else mock). */
+  const [liveOutputs, setLiveOutputs] = useState<Record<string, string>>({});
+  const clearLiveOutput = (t: Tab) =>
+    setLiveOutputs((o) => {
+      const next = { ...o };
+      delete next[t];
+      return next;
+    });
 
   // Per-tab inputs
   const [topic, setTopic] = useState("Exam-season offer for students");
@@ -127,12 +136,12 @@ export default function AiToolsPage() {
   const pendingReviews = reviewsMock.filter((r) => !r.replied).slice(0, 3);
   const picked = pendingReviews[reviewIdx] ?? pendingReviews[0];
 
-  // Outputs (mock EP-005 — variant flips on each generation)
-  const postText = aiTextOutputsMock.post[lang][variant];
-  const replyFull = aiTextOutputsMock.reply[lang][variant];
+  // Outputs — real EP-005 text when live, else mock variants.
+  const postText = liveOutputs.post ?? aiTextOutputsMock.post[lang][variant];
+  const replyFull = liveOutputs.reply ?? aiTextOutputsMock.reply[lang][variant];
   const replyText = len === "Short" ? firstSentence(replyFull) : replyFull;
-  const descAfter = aiTextOutputsMock.desc[lang][variant];
-  const fbBase = aiTextOutputsMock.fb[lang][variant];
+  const descAfter = liveOutputs.desc ?? aiTextOutputsMock.desc[lang][variant];
+  const fbBase = liveOutputs.fb ?? aiTextOutputsMock.fb[lang][variant];
   const fbText =
     emoji === "None" ? fbBase : emoji === "Some" ? `${fbBase} 📞` : `✨ ${fbBase} 🎉`;
   const qaPairs = aiQaPairsMock[lang === "mr" ? "mr" : "en"];
@@ -173,13 +182,32 @@ export default function AiToolsPage() {
               : tab === "fb"
                 ? { tool: "fb_post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : "warm", topic, emoji_level: emoji === "None" ? "none" : emoji === "Some" ? "some" : "festive", include_gbp_link: gbpLink === "Yes" }
                 : { tool: "festival", business_id: toolBiz.id, lang, festival, template: (tplIdx + 1) as 1 | 2 | 3, offer_line: offer };
-    void request; // handed to POST /api/ai/generate on Day 5
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setVariants((v) => ({ ...v, [tab]: v[tab] === 0 ? 1 : 0 }));
-      bumpUsage();
-    }, 400);
+    void (async () => {
+      // Live EP-005 when flipped in LIVE_ENDPOINTS; mock variants otherwise.
+      // Live output applied to the text tools; qa/creative keep structured
+      // mocks until their output parsing lands (noted in HANDOFF).
+      const live =
+        tab === "qa" || tab === "creative"
+          ? null
+          : await apiPost<AiGenerateResponse>("/api/ai/generate", request);
+      setTimeout(
+        () => {
+          setLoading(false);
+          if (live) {
+            setLiveOutputs((o) => ({ ...o, [tab]: live.output }));
+            setUsage(live.usage_today.used);
+            toast(
+              `Draft ready (${live.model_used}) — ${live.usage_today.used}/${live.usage_today.limit} requests today`,
+            );
+          } else {
+            setVariants((v) => ({ ...v, [tab]: v[tab] === 0 ? 1 : 0 }));
+            bumpUsage();
+          }
+        },
+        live ? 0 : 400,
+      );
+    })();
   };
 
   const saveToHistory = () => {

@@ -1,29 +1,52 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { BusinessListItem, SpendToday } from "@/types";
-import { businessesMock } from "@/components/mocks/businesses";
+import {
+  apiFetchResult,
+  setLiveDataDisabledHandler,
+} from "@/components/lib/api";
+import { useApiGet } from "@/components/hooks/use-api-get";
+import { businessesMock, isFixtureBusiness } from "@/components/mocks/businesses";
 import {
   spendTodayCapHitMock,
   spendTodayMock,
 } from "@/components/mocks/spend";
 
+/** CR-3 — EP-006 PDF language (shim until PdfLanguage lands in @/types). */
+export type PdfLang = "mr" | "en" | "hinglish";
+
 interface AppState {
-  /** All businesses (mock of GET /api/businesses until Day 5). */
+  /** All businesses — live `/api/businesses` when flipped, mock fallback. */
   businesses: BusinessListItem[];
   /** Globally selected business (drives workspace screens). */
   bizSel: BusinessListItem;
   setBizSelId: (id: string) => void;
-  /** EP-012 spend status — feeds pill, P1 card, cap banner. */
+  /** True when bizSel is the Manovedh fixture (mock id or seeded UUID). */
+  bizSelIsFixture: boolean;
+  /** EP-012 spend status — live when flipped; feeds pill + cap banner. */
   spend: SpendToday;
   /** Global cap-hit state: disables every paid action app-wide. */
   capHit: boolean;
   /** Settings → "Preview cap-hit state" toggle (P11). */
   capPreview: boolean;
   setCapPreview: (on: boolean) => void;
+  /** CR-1 — DataForSEO live-data master switch (default OFF, client call). */
+  liveDataEnabled: boolean;
+  setLiveDataEnabled: (on: boolean) => void;
   /** Category Finder → "Apply to audit" (updates P3 chips + fix #1). */
   catApplied: boolean;
   setCatApplied: (on: boolean) => void;
+  /** CR-3 — last chosen PDF language per business (default मराठी). */
+  pdfLangFor: (bizId: string) => PdfLang;
+  setPdfLang: (bizId: string, lang: PdfLang) => void;
   userName: string;
   userEmail: string;
 }
@@ -38,27 +61,91 @@ export function AppStateProvider({
   /** Start in cap-hit preview (dev preview / tests). */
   initialCapPreview?: boolean;
 }) {
+  // Live-or-mock reads (LIVE_ENDPOINTS gates; mock fallback on any failure).
+  const businessesQ = useApiGet("/api/businesses", businessesMock, {
+    delayMs: 0,
+  });
+  const spendQ = useApiGet("/api/spend/today", spendTodayMock, { delayMs: 0 });
+  // An empty live list ([]) is NOT null, so it slips past `?? mock` — guard it
+  // so bizSel is always valid and the shell never white-screens. (A genuinely
+  // empty account is a Day-7 go-live concern — flagged in HANDOFF.)
+  const businesses =
+    businessesQ.data && businessesQ.data.length > 0
+      ? businessesQ.data
+      : businessesMock;
+
   const [bizSelId, setBizSelId] = useState(businessesMock[0].id);
   const [capPreview, setCapPreview] = useState(initialCapPreview);
   const [catApplied, setCatApplied] = useState(false);
+  const [liveDataEnabled, setLiveDataEnabledState] = useState(false);
+  const [pdfLangByBiz, setPdfLangByBiz] = useState<Record<string, PdfLang>>({});
+
+  // CR-1: any route replying LIVE_DATA_DISABLED syncs the toggle off, so
+  // every paid button renders the same blocked state.
+  useEffect(() => {
+    setLiveDataDisabledHandler(() => setLiveDataEnabledState(false));
+    return () => setLiveDataDisabledHandler(null);
+  }, []);
+
+  // When the live list arrives with different ids (seed UUIDs), keep the
+  // selection valid — prefer the fixture business, else the first row.
+  useEffect(() => {
+    if (!businesses.some((b) => b.id === bizSelId)) {
+      const fixture = businesses.find((b) => isFixtureBusiness(b.id));
+      setBizSelId(fixture?.id ?? businesses[0].id);
+    }
+  }, [businesses, bizSelId]);
+
+  // CR-1: toggling persists via PATCH /api/settings when that route is
+  // flipped live; local state either way so the UI stays consistent.
+  const setLiveDataEnabled = useCallback((on: boolean) => {
+    setLiveDataEnabledState(on);
+    void apiFetchResult("/api/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dataforseo_live: on }),
+    });
+  }, []);
+
+  const setPdfLang = useCallback((bizId: string, lang: PdfLang) => {
+    setPdfLangByBiz((m) => ({ ...m, [bizId]: lang }));
+  }, []);
 
   const value = useMemo<AppState>(() => {
-    const spend = capPreview ? spendTodayCapHitMock : spendTodayMock;
+    const spend = capPreview
+      ? spendTodayCapHitMock
+      : (spendQ.data ?? spendTodayMock);
+    const bizSel =
+      businesses.find((b) => b.id === bizSelId) ?? businesses[0];
     return {
-      businesses: businessesMock,
-      bizSel:
-        businessesMock.find((b) => b.id === bizSelId) ?? businessesMock[0],
+      businesses,
+      bizSel,
       setBizSelId,
+      bizSelIsFixture: isFixtureBusiness(bizSel.id),
       spend,
       capHit: spend.blocked,
       capPreview,
       setCapPreview,
+      liveDataEnabled,
+      setLiveDataEnabled,
       catApplied,
       setCatApplied,
+      pdfLangFor: (bizId: string) => pdfLangByBiz[bizId] ?? "mr",
+      setPdfLang,
       userName: "Founder",
       userEmail: "founder@agency.in",
     };
-  }, [bizSelId, capPreview, catApplied]);
+  }, [
+    businesses,
+    bizSelId,
+    capPreview,
+    catApplied,
+    liveDataEnabled,
+    setLiveDataEnabled,
+    pdfLangByBiz,
+    setPdfLang,
+    spendQ.data,
+  ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

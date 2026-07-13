@@ -128,6 +128,23 @@ export const businessesMock: BusinessListItem[] = [
   },
 ];
 
+/**
+ * The Manovedh fixture business is identified by mock id (mock phase) OR the
+ * seeded UUID (live DB, supabase seed §2.9) — workspace screens carry full
+ * demo data for it only.
+ */
+export const FIXTURE_BUSINESS_IDS = new Set([
+  "biz-manovedh",
+  "11111111-1111-4111-8111-111111111111",
+]);
+
+export function isFixtureBusiness(id: string): boolean {
+  return FIXTURE_BUSINESS_IDS.has(id);
+}
+
+/** Seeded fixture audit row (TB-002) — the EP-002 read target on live DB. */
+export const SEEDED_AUDIT_ID = "a1111111-1111-4111-8111-111111111111";
+
 /** Prototype's business-switcher short labels (long names get ellipsis anyway). */
 export const businessShortNames: Record<string, string> = {
   "biz-manovedh": "मनोवेध हिप्नोक्लिनिक",

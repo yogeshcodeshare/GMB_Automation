@@ -18,9 +18,19 @@ import {
 } from "@/components/mocks/reviews";
 import { auditReportMock } from "@/components/mocks/audit-report";
 import { relativeDate } from "@/components/lib/format";
+import { useApiGet } from "@/components/hooks/use-api-get";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
+
+/** Contract bundle for `GET /api/reviews/:businessId` (mock = fixture). */
+const REVIEWS_FIXTURE = {
+  stats: reviewStatsMock,
+  reviews: reviewsMock,
+  cloud: keywordCloudMock,
+  trend: reviewTrendMock,
+};
 
 type Lang = "mr" | "en";
 type Tone = "Warm" | "Professional";
@@ -43,8 +53,13 @@ const ACTION_BTN =
 /** P6 Review Inbox — KPIs, quality strip, filters, AI drafts, cloud, trend. */
 export default function ReviewInboxPage() {
   const toast = useToast();
-  const { bizSel, setBizSelId } = useAppState();
-  const stats = reviewStatsMock;
+  const { bizSel, setBizSelId, bizSelIsFixture } = useAppState();
+  // Live `/api/reviews/:businessId` when flipped in LIVE_ENDPOINTS.
+  const reviewsQ = useApiGet(`/api/reviews/${bizSel.id}`, REVIEWS_FIXTURE, {
+    emptyValue: { stats: reviewStatsMock, reviews: [], cloud: [], trend: [] },
+  });
+  const bundle = reviewsQ.data ?? REVIEWS_FIXTURE;
+  const stats = bundle.stats;
 
   const [filter, setFilter] = useState<ReviewFilterKey>("all");
   const [drafts, setDrafts] = useState<Record<string, DraftState>>(() =>
@@ -65,7 +80,7 @@ export default function ReviewInboxPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
-  if (bizSel.id !== auditReportMock.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div
@@ -91,9 +106,39 @@ export default function ReviewInboxPage() {
     );
   }
 
+  if (reviewsQ.status === "loading") {
+    return (
+      <section className="flex flex-col gap-[14px]">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[70px]" />
+          ))}
+        </div>
+        <Skeleton className="h-[44px]" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[120px]" />
+        ))}
+      </section>
+    );
+  }
+
+  if (reviewsQ.status === "error") {
+    return (
+      <Card className="flex max-w-[560px] flex-col items-start gap-3 px-6 py-7">
+        <div className="text-[13.5px] font-bold text-band-crit">
+          Couldn&apos;t load the review inbox
+        </div>
+        <div className="text-[12.5px] text-ink-soft">{reviewsQ.error}</div>
+        <Button variant="ghost" size="xs" onClick={reviewsQ.retry}>
+          Retry
+        </Button>
+      </Card>
+    );
+  }
+
   const conn = bizSel.connection_status;
 
-  const rows = reviewsMock.filter((r) => {
+  const rows = bundle.reviews.filter((r) => {
     if (filter === "pending") return !r.replied;
     if (filter === "5") return r.rating === 5;
     if (filter === "low") return r.rating <= 3;
@@ -148,12 +193,12 @@ export default function ReviewInboxPage() {
   const trendPts = (() => {
     const W = 220;
     const H = 92;
-    const max = Math.max(...reviewTrendMock.map((p) => p.cumulative), 1);
-    const t0 = new Date(reviewTrendMock[0].date).getTime();
+    const max = Math.max(...bundle.trend.map((p) => p.cumulative), 1);
+    const t0 = new Date(bundle.trend[0]?.date ?? 0).getTime();
     const t1 = new Date(
-      reviewTrendMock[reviewTrendMock.length - 1].date,
+      bundle.trend[bundle.trend.length - 1]?.date ?? 0,
     ).getTime();
-    return reviewTrendMock.map((p) => {
+    return bundle.trend.map((p) => {
       const x = 8 + ((new Date(p.date).getTime() - t0) / (t1 - t0)) * (W - 28);
       const y = H - 8 - (p.cumulative / max) * (H - 20);
       return { x, y, ...p };
@@ -472,7 +517,7 @@ export default function ReviewInboxPage() {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-[6px]">
-              {keywordCloudMock.map((k) => (
+              {bundle.cloud.map((k) => (
                 <span
                   key={k.token}
                   className="rounded-chip bg-bg-app px-[11px] py-1 font-semibold text-ink"
@@ -487,6 +532,11 @@ export default function ReviewInboxPage() {
             <div className="mb-[10px] text-[13px] font-bold">
               Cumulative reviews
             </div>
+            {!lastPt ? (
+              <div className="text-[11.5px] text-ink-faint">
+                No review history yet.
+              </div>
+            ) : (
             <svg viewBox="0 0 220 92" className="block h-auto w-full">
               <polyline
                 points={trendPts.map((p) => `${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(" ")}
@@ -514,8 +564,9 @@ export default function ReviewInboxPage() {
                 {lastPt.cumulative}
               </text>
             </svg>
+            )}
             <div className="mt-[2px] flex justify-between font-mono text-[10px] text-ink-faint">
-              {reviewTrendMock
+              {bundle.trend
                 .filter((_, i) => i < 6)
                 .map((p) => (
                   <span key={p.date}>
