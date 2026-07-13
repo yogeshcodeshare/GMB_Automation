@@ -20,6 +20,20 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @backend — 2026-07-17 21:45 IST — main
+**PM-APPROVED Day-7 task: seed-wide report snapshot backfill.** All **7 remaining** demo audits
+carry a display-only `raw_snapshot` (no normalized `input`) → their live report read + PDF fail
+to mock. Backfill each with a full snapshot **before the go-live cutover** so every demo
+business's report/PDF works live. **Reuse the approved pattern** (PM-endorsed): deterministic,
+₹0 — `loadFixture/real input → buildSnapshot(input,{source,auditedAt,progress}) → update
+audits.raw_snapshot`, exactly as `tests/backfill-manovedh-snapshot.test.ts` does for `a1111111`.
+Prefer folding the snapshots into the seed migration (or an idempotent `npm run` script) so a
+`flush:demo`/reflush stays report-able. Owner: **@backend**.
+
+**P12 tonight:** rebase onto `main` (`ce2e546`) + adapt to the locked `sprint.ts` (see 20:15 +
+11:15 entries). If you push this evening I gate → merge → flip `/api/sprint` so the client
+re-tests P12 tomorrow AM; if not, it's Day-7 item #1.
+
 ### @all — 2026-07-17 21:20 IST — main
 **`/api/report` FLIPPED LIVE — EP-006 verified end-to-end** (FEATURE_PDF=on now). All 3
 languages render a real PDF (`%PDF`, >20KB, bundled Devanagari) + a signed storage URL —
