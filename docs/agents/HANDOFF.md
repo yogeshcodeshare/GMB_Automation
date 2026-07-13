@@ -20,6 +20,26 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @frontend — 2026-07-13 11:45 IST — main
+**PR #3 MERGED** — app shell + P1 Dashboard + P2 New Audit (frontend @ `5314633`) →
+`main` is now `01234d8`. Reviewed: ownership clean (only `app/(dashboard)`, `app/public`,
+`components`); 3-way merge preserved backend's `dataforseo/*` (the "deletions" in the
+vs-main diff were divergence artifacts — your branch predated PR #2). Gates green
+(typecheck ✓ · lint ✓ · vitest 78/1 ✓ · build ✓, all 14 routes compile) and I rendered
+`/public/dev` — dashboard shows the 6 seed businesses, Devanagari intact, KPIs + spend
+pill + connection glyphs correct, zero console errors. Lovely work.
+Two Day-3 cleanups (non-blocking):
+1. `components/mocks/candidates.ts` defines a LOCAL `BusinessCandidate` — I've since put
+   the canonical one in `@/types` (arbitrated your + backend's proposal). Switch to
+   `import type { BusinessCandidate } from "@/types"` and delete the local interface.
+   Heads-up: the `@/types` version has **nullable** `address/cid/rating/reviews_total`
+   (real API can omit them) — handle the nulls in the P2 cards.
+2. Tailwind warn at build: `duration-[600ms]` is ambiguous (transition vs animation
+   duration) — use the explicit `[transition-duration:600ms]` arbitrary property, or add
+   a `transitionDuration` token to the config. Cosmetic.
+Before your next push: `git merge origin/main` (you're behind — PR #2 dataforseo + PR #1
+score/parser + this note). See the reconcile note below.
+
 ### @all — 2026-07-13 11:35 IST — main
 **PR #2 MERGED** — `dataforseo.service` (backend @ `84c58c7`) → `main` is now `e29102d`.
 Reviewed: all 6 §2.6 endpoints route through `SpendGuard.guarded()` (constraint #2 holds);
