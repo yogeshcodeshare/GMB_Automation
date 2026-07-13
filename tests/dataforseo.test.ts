@@ -55,6 +55,7 @@ function makeClient(
   const client = new DataForSeoClient({
     guard,
     credentials: CREDS,
+    liveGate: async () => {}, // gate OPEN — overridable via overrides
     fetchImpl: impl,
     pollIntervalMs: 1,
     maxPollMs: 50,

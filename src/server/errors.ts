@@ -10,9 +10,7 @@ export class FeatureDisabledError extends Error {
 
 /** CR-1 — the live-data master switch is OFF (settings.dataforseo_live_enabled,
  * default false). Thrown at the DataForSEO client entry BEFORE any spend
- * reservation or network call. HTTP 503.
- * NOTE: "LIVE_DATA_DISABLED" is a contract-proposal addition to ErrorCode —
- * MAIN formalises it in @/types; errFrom emits it verbatim meanwhile. */
+ * reservation or network call. HTTP 503. */
 export class LiveDataDisabledError extends Error {
   readonly code = "LIVE_DATA_DISABLED" as const;
   constructor() {

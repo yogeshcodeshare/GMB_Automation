@@ -44,8 +44,25 @@ export async function assertLiveDataEnabled(db: SupabaseClient): Promise<void> {
   }
 }
 
-/** Client-entry gate factory (defense in depth beside SpendGuard): the
- * DataForSeoClient calls this before ANY reserve or network I/O. */
-export function makeLiveGate(db: SupabaseClient): () => Promise<void> {
-  return () => assertLiveDataEnabled(db);
+/**
+ * Client-entry gate factory (defense in depth beside SpendGuard): the
+ * DataForSeoClient calls this before ANY reserve or network I/O.
+ * The flag read is memoised for a short TTL so a 25-point grid fan-out
+ * costs ONE settings read, not 25 (PM fix-list, Day 6). A founder toggle
+ * takes effect within the TTL — fine for a kill-switch that gates cost,
+ * not safety-of-life.
+ */
+export function makeLiveGate(
+  db: SupabaseClient,
+  opts: { ttlMs?: number; now?: () => number } = {}
+): () => Promise<void> {
+  const ttlMs = opts.ttlMs ?? 5_000;
+  const now = opts.now ?? Date.now;
+  let cached: { value: boolean; at: number } | null = null;
+  return async () => {
+    if (!cached || now() - cached.at >= ttlMs) {
+      cached = { value: await readLiveDataFlag(db), at: now() };
+    }
+    if (!cached.value) throw new LiveDataDisabledError();
+  };
 }

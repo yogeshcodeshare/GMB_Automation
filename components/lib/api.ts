@@ -19,13 +19,13 @@ export const LIVE_ENDPOINTS: Record<string, boolean> = {
   // Paid / gated on DataForSEO verification (CR-1 deferred — stay OFF):
   "/api/businesses/resolve": false,
   "/api/posts-audit": false,
-  // Wired (B3) but OFF until MAIN confirms: settings needs the
-  // dataforseo_live_enabled migration; report/wa flips are MAIN's call
-  // (FEATURE_PDF / WA keys). Flipping is the entire swap — callers are live.
-  "/api/settings": false,
+  // CR-1 toggle persists now: migration 20260717000001 applied + B2 field-name
+  // fixed ({ dataforseo_live_enabled }) — flipped LIVE by MAIN (Day-6 close-out).
+  "/api/settings": true,
+  // OFF: report needs FEATURE_PDF=on (absent); wa needs Meta keys (next week);
+  // sprint needs the P12 backend merged (EP-021 bounced for contract-adapt).
   "/api/report": false,
   "/api/wa/send": false,
-  // EP-021/022 — backend lands them Day 6; P12 is wired, flip when merged:
   "/api/sprint": false,
 };
 
