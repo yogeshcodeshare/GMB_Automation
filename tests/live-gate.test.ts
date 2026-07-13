@@ -128,6 +128,73 @@ describe("CR-1 — settings flag storage (default OFF)", () => {
   });
 });
 
+describe("CR-1 — liveGate TTL cache (PM fix-list: one read per grid fan-out)", () => {
+  function countingDb(flag: boolean) {
+    let reads = 0;
+    const client = {
+      from() {
+        reads++;
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          maybeSingle: async () => ({
+            data: { dataforseo_live_enabled: flag },
+            error: null,
+          }),
+        };
+      },
+    };
+    return { client: client as never, count: () => reads };
+  }
+
+  it("25 gate calls inside the TTL = exactly ONE settings read", async () => {
+    const { client, count } = countingDb(true);
+    let t = 1_000;
+    const gate = makeLiveGate(client, { ttlMs: 5_000, now: () => t });
+    for (let i = 0; i < 25; i++) await gate();
+    expect(count()).toBe(1);
+    t += 5_001; // TTL expired → next call re-reads
+    await gate();
+    expect(count()).toBe(2);
+  });
+
+  it("a flag flip becomes effective after the TTL, and OFF still throws", async () => {
+    let flag = true;
+    let reads = 0;
+    const client = {
+      from() {
+        reads++;
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          maybeSingle: async () => ({
+            data: { dataforseo_live_enabled: flag },
+            error: null,
+          }),
+        };
+      },
+    } as never;
+    let t = 0;
+    const gate = makeLiveGate(client, { ttlMs: 1_000, now: () => t });
+    await gate(); // ON — passes
+    flag = false;
+    t += 1_001;
+    await expect(gate()).rejects.toBeInstanceOf(LiveDataDisabledError);
+    // and it KEEPS throwing from cache without extra reads inside the TTL
+    const readsAfterFlip = reads;
+    await expect(gate()).rejects.toBeInstanceOf(LiveDataDisabledError);
+    expect(reads).toBe(readsAfterFlip);
+  });
+});
+
 describe("settings store — full Settings read/patch (contract: Settings / Partial<Settings>)", () => {
   it("readSettings returns the full row; defaults when absent", async () => {
     const { client, tables } = miniDb(["settings"]);

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOOLS: AiToolType[] = ["post", "reply", "description", "qa", "fb_post", "festival", "category"];
 const LANGS: Language[] = ["mr", "en", "hinglish"];
-const TONES: Tone[] = ["warm", "professional"];
+const TONES: Tone[] = ["warm", "professional", "festive"];
 
 /** Per-tool request validation — mirrors the AiGenerateRequest union. */
 function parse(raw: unknown): AiGenerateRequest | string {

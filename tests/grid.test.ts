@@ -166,6 +166,7 @@ function mockedVendor(opts: MockedVendorOpts) {
   const dfs = new DataForSeoClient({
     guard: new SpendGuard(store),
     credentials: { login: "l", password: "p" },
+    liveGate: async () => {}, // gate OPEN — these tests exercise the guarded flow
     fetchImpl,
     pollIntervalMs: 1,
     maxPollMs: 100,
