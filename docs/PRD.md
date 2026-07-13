@@ -170,5 +170,81 @@ tools.<domain> live → login works → 3 real audits validated vs live Google �
 
 ---
 
+## 1.9 FUTURE SCOPE (v1.9 addendum, 12 Jul 2026) — Rank-Growth Engine + Security Hardening Roadmap
 
-*(Full combined blueprint: GMB_Tool_Development_Plan.md v1.8)*
+> Status: **post-sprint scope.** Nothing in §1.9 changes the 7-day sprint (M0–M7) or its exit criteria. Items here are traceable as FS-1xx (features) and SEC-0xx (security), phased R1–R3 after MVP. All hard constraints continue to apply: DataForSEO is the only paid service, approve-before-publish, no client passwords, Devanagari everywhere, spend guard on every paid call.
+
+### 1.9a Evidence base — what actually moves local rank (research snapshot, Jul 2026)
+
+| Signal group | Weight (Whitespark 2026 LSRF) | Can we control it? | Tool implication |
+|---|---|---|---|
+| Proximity to searcher | ~55% of ranking decision | ✖ No | Be honest in reports; win the *achievable* radius (grid top-3 coverage %, not "rank #1 everywhere") |
+| GBP signals (category, completeness, activity) | 32% of controllable weight | ✔ Fully | Primary category = **#1 controllable factor**; secondary categories = #8; "open at time of search" is a **new top-5 factor** in 2026 |
+| Reviews | ~20% and rising | ✔ Via process | **Velocity now outweighs total count** (a business getting 4+/week outranks a stale bigger profile); keywords-in-reviews and owner replies ≤48h are measurable sub-factors; 68% of consumers filter at 4★+ |
+| On-page (website) | ~15% | ✔ Fully | City+service landing pages, LocalBusiness/FAQ schema, NAP match |
+| Behavioral (CTR, calls, directions) | ~9% | ◐ Indirect | Posts/photos drive CTR (not rank directly); Performance API measures it |
+| Links | ~8% | ◐ Slow | Local editorial mentions ("best of Karad" lists) — also the top AI-Overviews citation factor |
+| Citations/NAP | ~6% | ✔ Fully | Fewer, accurate listings beat many conflicting ones; entity consistency feeds AI search |
+| AI Overviews / conversational search | overlay on all of the above | ◐ | Sits ABOVE the local pack for many queries in 2026; needs schema, entity consistency, editorial mentions |
+
+**Positioning honesty (goes in every client conversation):** proximity dominates, so "rank 1 everywhere" cannot be promised by anyone. The tool's promise is measurable: *top-3 grid coverage grows month over month*. GM-007/008 below make that a number.
+
+### 1.9b Rank-Growth Engine (FS-101..FS-115)
+
+Automation levels: **A** = fully automatic · **T** = automatic draft, founder approve-tap · **M** = tool-assisted manual (checklist + prefilled values).
+
+| ID | Feature | Ranking lever (evidence §1.9a) | Auto | Data source / cost | Notes |
+|---|---|---|---|---|---|
+| FS-101 | **Category Guardian** — quarterly re-scan of top-10 profiles per money keyword; detects competitor category shifts; proposes primary/secondary changes with expected impact | Primary category = #1 controllable factor | T | `local_finder` + `my_business_info` (~₹2/scan/quarter) | Extends M1 category finder into a standing monitor |
+| FS-102 | **Review Velocity Autopilot** — WhatsApp review-request drips (trigger: visit/invoice/manual), printable QR poster per client, weekly velocity target auto-set to beat top competitor, falling-behind alerts | Velocity > count (2026); prominence | A (after template approval) | wa.service + n8n; ₹0 marginal | The single highest-ROI automation in the suite |
+| FS-103 | **Keyword-Seeded Reply Engine** — replies naturally weave service+city keywords; 48h-SLA board; reply-rate KPI vs competitors | Keywords-in-reviews + replies ≤48h behavioral | T | ai.service; ₹0 | Extends M3/M5 review inbox; SEC-002 applies |
+| FS-104 | **Services & Products Completeness Engine** — drafts full services/products lists with descriptions from category taxonomy + competitor gap; one-tap publish | GBP completeness (32% group) | T | taxonomy + `my_business_info`; ₹0–2 | Kills the "services empty" finding permanently |
+| FS-105 | **Posts Autopilot 2.0** — weekly scheduled posts with UTM-tagged links, 12-festival calendar, offer templates; CTR measured via Performance API | Behavioral/CTR (honest label: not a direct rank factor) | T | ai.service + GBP API; ₹0 | Upgrade of M6 scheduler |
+| FS-106 | **Photo Cadence Engine** — monthly WhatsApp photo-request to client, auto-compress + rename with service keywords, count benchmark vs top-3 | Profile activity + conversion | A request / T publish | Supabase storage; ₹0 | |
+| FS-107 | **Q&A Seeding** — drafts owner-side FAQs + answers (Marathi/English) from services + common review themes | Completeness + AI-answer citability | T | ai.service; ₹0 | |
+| FS-108 | **Citations Builder + NAP Watchdog** — India directory pack (Justdial, Sulekha, IndiaMART, TradeIndia, YellowPages…), assisted free-listing submissions with prefilled NAP, quarterly consistency re-scan | Citations 6% + entity consistency for AI search | M build / A watch | Own crawler ₹0; optional DataForSEO `business_listings` scan with cost preview | "Fewer, accurate" > volume |
+| FS-109 | **Local Landing Page Generator** — service+city pages (static HTML export or hosted on tools subdomain) with LocalBusiness/Service/FAQPage schema, sameAs links, embedded reviews | On-page 15% + AI Overviews parsing | T | Playwright templates; ₹0 | Reuses pdf.service render pipeline |
+| FS-110 | **Behavioral Signals Watch** — calls/directions/site-clicks trends, anomaly alerts; hours-coverage audit vs search-time distribution ("open at time of search" = new top-5 factor) | Behavioral 9% + hours factor | A | Business Profile Performance API (free) | Needs GBP API approval |
+| FS-111 | **Grid-to-Action Planner** — converts weak grid directions into concrete tasks (area landing page FS-109, area citations FS-108, service-area settings) | Distance mitigation within what's possible | A draft / T accept | Existing M2 grids; ₹0 | Feeds Optimization Sprint (P12) |
+| FS-112 | **Competitor Delta Watch** — weekly diff of tracked competitors (categories, review velocity, posts, photos); auto-inserts counter-tasks into the monthly cycle | All groups — reactive defense | A | `my_business_info` batch ~₹1–2/competitor/week, spend-guarded | Cap per client to respect GM-005 |
+| FS-113 | **AI-Search Readiness Pack** — entity audit across web, FAQPage schema check, Bing Places + Apple Business Connect sync checklists (both free), local "best-of" editorial outreach list | AI Overviews above-pack visibility; links | M | Own crawler; ₹0 | Differentiator no local competitor offers |
+| FS-114 | **Rank-1 Playbook Generator** — per-client 90-day path-to-top-3 plan auto-composed from audit + grid + competitor gaps + velocity data; refreshed monthly; becomes the Optimization Sprint backlog | Orchestrates all levers | A draft / T approve | All existing data; ₹0 | The "brain" feature — sells the ₹4,999 tier |
+| FS-115 | **Spam Fighter** — flags keyword-stuffed names / suspect competitor listings on tracked keywords; builds evidence pack for Google Business Redressal form | Removes unfair competitors from the pack | A detect / M submit | Existing scans; ₹0 | High leverage in tier-3 markets; fully white-hat |
+
+**Explicitly out of scope, permanently (policy + law):** review gating, incentivized/fake reviews, bulk fake Q&A, keyword-stuffing the business name. Google policy violations + Indian consumer-protection exposure; the tool refuses to automate these and warns when it detects them on the client's own profile.
+
+**New goal metrics:** GM-007 — median top-3 grid coverage +20 points within 90 days per managed client. GM-008 — review velocity ≥4/week sustained for 80% of clients on FS-102.
+
+### 1.9c Security Hardening Roadmap (SEC-001..SEC-012)
+
+Priorities: **P0** = inside current sprint (owned by the milestone named) · **P1** = before public launch · **P2** = before/at VPS migration.
+
+| ID | Threat (attack surface) | Mitigation | Priority → owner |
+|---|---|---|---|
+| SEC-001 | **SSRF via website-audit crawler** (user-supplied URLs can point at internal/cloud-metadata addresses) | http(s) only; resolve-then-connect with private/link-local/metadata IP blocklist; 10s timeout; response size cap; redirect depth 2 with re-validation | P0 → M1.5 (backend) |
+| SEC-002 | **Prompt injection via reviews/website text** (OWASP LLM01:2025 — attack success up to 84% in agentic setups; "may never be fully patched") | Treat all fetched text as data: delimiter/spotlighting prompts, instruction-hardened system prompt, output validation (length, language, no URLs/phones unless from business record), rejected-output log; approve-before-publish stays the final human backstop | P0 → M3 (backend) |
+| SEC-003 | **Stored XSS → PDF injection** (business names/reviews rendered into Playwright HTML) | Escape every interpolation; strip script/iframe/event handlers; CSP in report template; same rules for Devanagari strings | P0 → M4 (backend) |
+| SEC-004 | **Public checker abuse / spend-drain** | Turnstile + 3/IP/day + 50/day global (built) **plus** separate public spend sub-cap, phone-format validation, disposable-number heuristic, per-ASN backoff | P1 → M7 |
+| SEC-005 | **Supabase authz drift** (the RLS-without-GRANTs class of bug found 12 Jul) | 42501-aware RLS tests in CI (done); migration checklist: every new table ships RLS + policy + grant in the same file; build-time grep that secret key never reaches client bundle | P0 → done, keep in CI (main) |
+| SEC-006 | **OAuth refresh-token theft** (TB-009) | AES-256-GCM at rest, key from env only, rotate on disconnect, minimal scope (business.manage), audit log of every publish action | P1 → M6 |
+| SEC-007 | **API route hygiene** | zod validation on all inputs (contract), rate limits on mutating routes, structured audit log without client PII, generic error envelopes (no stack traces) | P1 → M5–M7 |
+| SEC-008 | **Supply chain / CI** | Dependabot + `npm audit` CI gate, pinned lockfile, GitHub secret scanning, branch protection on `main` (only MAIN agent merges) | P1 → main |
+| SEC-009 | **WhatsApp webhook forgery/replay** | Verify `X-Hub-Signature-256`, timestamp replay window, idempotent message handling | P1 → wa.service go-live |
+| SEC-010 | **Data loss** (Supabase free-tier pause/limits) | Nightly `pg_dump` to VPS, weekly restore drill, storage export | P2 → M9/VPS |
+| SEC-011 | **DPDP Act 2023** (leads + client data) | Consent registry (TB-008 has it), purpose limitation, delete-on-request endpoint, retention job (public leads 180 days), breach-notification runbook | P2 |
+| SEC-012 | **VPS exposure at migration** | Let's Encrypt TLS, UFW default-deny, fail2ban, rootless Docker, nginx rate-limit zone in front of public checker | P2 → VPS move |
+
+### 1.9d Phasing & cost impact
+
+| Phase | When | Ships | Cost impact |
+|---|---|---|---|
+| R1 | Weeks 2–4 (with first clients) | FS-102, FS-103, FS-105, FS-110 + all remaining P0/P1 SEC items | ~₹0 marginal |
+| R2 | Aug 2026 | FS-101, FS-104, FS-106, FS-107, FS-111, FS-112 | +₹5–15/client/month — inside GM-005 (<₹500/mo at 20 clients) |
+| R3 | Sep–Oct 2026 (v2 tier) | FS-108, FS-109, FS-113, FS-114, FS-115 | justifies a ₹4,999/mo "GMB Boost Pro" tier |
+
+*Research sources: Whitespark 2026 Local Search Ranking Factors; BrightLocal local-algorithm guide & 2026 consumer survey; Google Business Profile Help (relevance/distance/prominence); PinMeTo & local-SEO 2026 AI-search guides; OWASP LLM Top-10 2025/26 (LLM01 prompt injection).*
+
+---
+
+
+*(Full combined blueprint: GMB_Tool_Development_Plan.md v1.9)*

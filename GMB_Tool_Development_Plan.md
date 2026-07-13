@@ -1,4 +1,4 @@
-# GMB Sarathi — Development Blueprint (PRD + ERD + Milestones) — v1.8 (production-ready, final for dev — design-sync verified)
+# GMB Sarathi — Development Blueprint (PRD + ERD + Milestones) — v1.9 (production-ready — adds §1.9 Future Scope: Rank-Growth Engine FS-101..115 + Security Roadmap SEC-001..012)
 
 **Project:** Own GMB audit & management tool ("GMB Sarathi" — working name; = charioteer/guide in Marathi)
 **Goal type:** Internal agency tool (v1) → white-label product (v2, later)
@@ -396,6 +396,19 @@ MS9-T01 per-client ops checklist widget (auto-ticks from actions) · T02 WhatsAp
 | DataForSEO ($1 trial → $50 deposit, credits never expire) | ₹4,700 | ~₹240–480 consumed |
 | Everything else (VPS, Supabase, OpenRouter free, GBP APIs incl. Performance, PSI API, Leaflet/OSM, fonts, SSL, n8n, WhatsApp flows) | ₹0 | ₹0 |
 | Google billing card | **not needed anywhere** | — |
+
+---
+
+# APPENDIX D — FUTURE SCOPE (v1.9, 12 Jul 2026)
+
+**The full, detailed Future Scope lives in `docs/PRD.md` §1.9** (single write-up, not duplicated here). Summary of what it adds:
+
+- **§1.9a Evidence base** — Whitespark/BrightLocal 2026 ranking-factor weights (proximity ~55% uncontrollable; GBP signals 32% with primary category the #1 controllable factor and "open at time of search" a new top-5 signal; reviews ~20% with **velocity now outweighing count**; on-page 15%; behavioral 9%; links 8%; citations 6%; AI Overviews sitting above the pack). Honest promise: growth in **top-3 grid coverage %**, never "rank 1 guaranteed".
+- **§1.9b Rank-Growth Engine FS-101..FS-115** — Category Guardian, Review Velocity Autopilot (WhatsApp drips + QR), Keyword-Seeded Reply Engine, Services Completeness Engine, Posts Autopilot 2.0 (UTM + festivals), Photo Cadence, Q&A Seeding, Citations Builder + NAP Watchdog (India directory pack), Local Landing Page Generator (schema), Behavioral Signals Watch (Performance API + hours-coverage), Grid-to-Action Planner, Competitor Delta Watch, AI-Search Readiness Pack (Bing/Apple sync, editorial mentions), Rank-1 Playbook Generator (the monthly auto-composed path-to-top-3), Spam Fighter (redressal evidence packs). Each with automation level (auto / approve-tap / assisted), data source and cost under the DataForSEO-only rule. White-hat enforced: no review gating, no fake reviews, no name stuffing.
+- **§1.9c Security Roadmap SEC-001..SEC-012** — SSRF guard in the website crawler (P0/M1.5), prompt-injection defenses for review/website text into ai.service (P0/M3, OWASP LLM01), XSS→PDF escaping (P0/M4), public-checker abuse + spend-drain controls (P1/M7), Supabase authz-drift CI tests (done 12 Jul — the RLS-without-GRANTs bug class), OAuth token encryption + audit log (P1/M6), API hygiene, supply-chain CI gates, WhatsApp webhook signature verification, backup/DR, DPDP Act 2023 compliance, VPS hardening at migration.
+- **§1.9d Phasing** — R1 (weeks 2–4): FS-102/103/105/110 + P0/P1 security. R2 (Aug 2026): FS-101/104/106/107/111/112. R3 (Sep–Oct, "GMB Boost Pro" ₹4,999 tier): FS-108/109/113/114/115. New goal metrics **GM-007** (median top-3 grid coverage +20 pts in 90 days) and **GM-008** (review velocity ≥4/week for 80% of clients).
+
+Nothing in Appendix D changes the current 7-day sprint scope or exit criteria.
 
 ---
 
