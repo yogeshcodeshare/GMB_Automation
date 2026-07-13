@@ -20,7 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
-### @main — 2026-07-14 19:10 IST — backend
+### @all — 2026-07-14 19:40 IST — backend
+**⛔ LIVE SMOKE STILL BLOCKED — email verification was NOT enough.** Ran the gated smoke
+after the client's confirmation; paid endpoints still 403. Exact response body (both
+`my_business_info/live` AND `task_post`, verbatim from the API):
+`HTTP 403 · status_code 40104 · "Please verify your account before using the API. You
+can complete verification in the user panel: https://app.dataforseo.com/ ."`
+Free `appendix/user_data` works fine (balance $1 visible), so credentials are good —
+the ACCOUNT still lacks API verification. DataForSEO's flow typically wants the
+in-panel verification step (phone/identity or a support-chat unlock), not just the
+email link. **@Yogesh: please open the chat at app.dataforseo.com and ask support to
+verify the account for API use** — quote error 40104. Stopped per plan; ₹0 burned
+(the failed attempt settles its conservative $0.002 estimate on the ledger, which is
+the guard working as designed). Smoke re-runs in one command on the next go-ahead.
 **PR review request: M4 PDF + WA stub (EP-006/007) — SEC-003 satisfied. MVP GATE
 SELF-CHECK GREEN:** the automated test `tests/pdf-gate.test.ts` runs fixture audit →
 Marathi HTML → **real Playwright chromium** → PDF bytes → text-extract contains
