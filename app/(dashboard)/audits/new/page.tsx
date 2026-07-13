@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { AuditRequest, AuditStage, BusinessCandidate } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
-import { candidatesMock } from "@/components/mocks/candidates";
+import {
+  candidatesMock,
+  searchCandidatesMock,
+} from "@/components/mocks/candidates";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -37,16 +40,6 @@ const STAGES: Array<{ key: AuditStage; label: string; caption: string }> = [
   },
   { key: "scoring", label: "Scoring", caption: "Applying the /100 rubric" },
 ];
-
-/** Mock resolver — fixture candidates for fixture-ish queries, else none. */
-function searchMock(name: string): BusinessCandidate[] {
-  const q = name.trim().toLowerCase();
-  if (!q) return [];
-  const hit = ["मनोवेध", "manovedh", "hypno", "avani", "हिप्नो"].some((k) =>
-    q.includes(k.toLowerCase()),
-  );
-  return hit ? candidatesMock : [];
-}
 
 const CAPTION_CLASS =
   "text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft";
@@ -104,7 +97,7 @@ export default function NewAuditPage() {
     setSel(0);
     timers.current.push(
       setTimeout(() => {
-        const found = searchMock(name);
+        const found = searchCandidatesMock(name);
         setCandidates(found);
         setSearch(found.length ? "results" : "none");
       }, 350),
@@ -113,11 +106,13 @@ export default function NewAuditPage() {
 
   const runAudit = () => {
     // Typed exactly like the Day-5 EP-001 call so the swap is mechanical.
+    // Manual mode prefers CID — EP-001 rejects a bare place_id (backend FYI 13 Jul).
     const request: AuditRequest = {
       name: candidates[sel]?.name ?? name,
       city,
-      place_id: manual && placeId ? placeId : candidates[sel]?.place_id,
-      cid: manual && cid ? cid : undefined,
+      cid: manual && cid ? cid : (candidates[sel]?.cid ?? undefined),
+      place_id:
+        manual && placeId ? placeId : candidates[sel]?.place_id,
       options: {
         competitors: comp === "Top 3" ? 3 : 5,
         website_audit: web === "Yes",
@@ -154,7 +149,7 @@ export default function NewAuditPage() {
           </div>
           <div className="mb-[14px] h-[6px] overflow-hidden rounded-[3px] bg-[#EDEAE3]">
             <div
-              className="h-full rounded-[3px] bg-brand transition-[width] duration-[600ms] ease-out"
+              className="h-full rounded-[3px] bg-brand transition-[width] ease-out [transition-duration:600ms]"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -318,20 +313,25 @@ export default function NewAuditPage() {
           Enter Place ID / CID manually
         </button>
         {manual && (
-          <div className="mt-[10px] flex flex-wrap gap-[10px]">
-            <input
-              value={placeId}
-              onChange={(e) => setPlaceId(e.target.value)}
-              placeholder="Place ID — ChIJ…"
-              className="min-w-[200px] flex-[1.4] rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[13px] py-[11px] font-mono text-[12.5px] outline-brand"
-            />
-            <input
-              value={cid}
-              onChange={(e) => setCid(e.target.value)}
-              placeholder="CID — 1129…"
-              className="min-w-[150px] flex-1 rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[13px] py-[11px] font-mono text-[12.5px] outline-brand"
-            />
-          </div>
+          <>
+            <div className="mt-[10px] flex flex-wrap gap-[10px]">
+              <input
+                value={cid}
+                onChange={(e) => setCid(e.target.value)}
+                placeholder="CID — 1129…"
+                className="min-w-[200px] flex-[1.4] rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[13px] py-[11px] font-mono text-[12.5px] outline-brand"
+              />
+              <input
+                value={placeId}
+                onChange={(e) => setPlaceId(e.target.value)}
+                placeholder="Place ID — ChIJ… (optional)"
+                className="min-w-[150px] flex-1 rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[13px] py-[11px] font-mono text-[12.5px] outline-brand"
+              />
+            </div>
+            <div className="mt-[6px] text-[11.5px] text-ink-soft">
+              CID starts the audit directly — a Place ID alone can&apos;t.
+            </div>
+          </>
         )}
       </Card>
 
@@ -388,10 +388,10 @@ export default function NewAuditPage() {
           <Button
             size="lg"
             onClick={runAudit}
-            disabled={search !== "results" && !(manual && (placeId || cid))}
+            disabled={search !== "results" && !(manual && cid.trim())}
             title={
-              search !== "results" && !(manual && (placeId || cid))
-                ? "Search and pick a business (or enter a Place ID) first"
+              search !== "results" && !(manual && cid.trim())
+                ? "Search and pick a business (or enter a CID) first"
                 : undefined
             }
           >

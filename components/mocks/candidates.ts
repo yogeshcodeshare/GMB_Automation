@@ -6,6 +6,20 @@ import type { BusinessCandidate } from "@/types";
  * "मनोवेध हिप्नोक्लिनिक" + "Karad" → 2 matches. Swapped for the real route
  * on Day 5.
  */
+/**
+ * Mock resolver behaviour: fixture-ish queries return the two candidates,
+ * anything else returns none (drives the P2 no-results state). Replaced by
+ * the real `GET /api/businesses/resolve` on Day 5.
+ */
+export function searchCandidatesMock(name: string): BusinessCandidate[] {
+  const q = name.trim().toLowerCase();
+  if (!q) return [];
+  const hit = ["मनोवेध", "manovedh", "hypno", "avani", "हिप्नो"].some((k) =>
+    q.includes(k.toLowerCase()),
+  );
+  return hit ? candidatesMock : [];
+}
+
 export const candidatesMock: BusinessCandidate[] = [
   {
     place_id: "ChIJXQL5mR3BwjsRkH4v7VZ9aQY",

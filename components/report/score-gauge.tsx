@@ -6,14 +6,26 @@ import { BAND_STROKE } from "@/components/ui/band";
  * band color (#C77D00 amber), mono 34/700 center (handoff P3 spec).
  * Track length 245 = 75% of circumference 2π·52 ≈ 326.7.
  */
-export function ScoreGauge({ score }: { score: number }) {
+export function ScoreGauge({
+  score,
+  size = 150,
+  stroke,
+  subtitle = "/ 100",
+}: {
+  score: number;
+  /** Rendered px size (viewBox stays 140). */
+  size?: number;
+  /** Override the band stroke (e.g. PSI banding differs from the rubric's). */
+  stroke?: string;
+  subtitle?: string;
+}) {
   const CIRC = 326.7;
   const TRACK = 245;
   const value = (Math.max(0, Math.min(100, score)) / 100) * TRACK;
   return (
     <svg
-      width="150"
-      height="150"
+      width={size}
+      height={size}
       viewBox="0 0 140 140"
       role="img"
       aria-label={`Score ${score} of 100`}
@@ -34,7 +46,7 @@ export function ScoreGauge({ score }: { score: number }) {
         cy="70"
         r="52"
         fill="none"
-        stroke={BAND_STROKE[bandFor(score)]}
+        stroke={stroke ?? BAND_STROKE[bandFor(score)]}
         strokeWidth="12"
         strokeLinecap="round"
         strokeDasharray={`${value.toFixed(1)} ${CIRC}`}
@@ -59,7 +71,7 @@ export function ScoreGauge({ score }: { score: number }) {
         fontFamily="var(--font-plex-mono), monospace"
         fill="#5A6560"
       >
-        / 100
+        {subtitle}
       </text>
     </svg>
   );
