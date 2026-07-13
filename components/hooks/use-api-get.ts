@@ -18,11 +18,19 @@ export function useApiGet<T>(
     delayMs = 400,
     post,
     emptyValue,
+    allowEmptyLive = false,
   }: {
     delayMs?: number;
     post?: Record<string, unknown>;
     /** What `?mock=empty` resolves to for non-array fixtures. */
     emptyValue?: T;
+    /**
+     * By default a successful-but-EMPTY live array falls back to the mock
+     * (white-screen protection for every array endpoint — demo phase).
+     * Set true for endpoints where a real empty list is a legitimate state
+     * (post-flush go-live flips this per screen).
+     */
+    allowEmptyLive?: boolean;
   } = {},
 ): MockQueryResult<T> & { source: "live" | "mock" } {
   const [state, setState] = useState<{
@@ -45,9 +53,15 @@ export function useApiGet<T>(
     if (mock === "loading") return;
 
     void (async () => {
-      const live = post
+      const fetched = post
         ? await apiPost<T>(path, post)
         : await apiGet<T>(path);
+      // Empty live array → mock fallback unless opted out (MAIN's Day-6 ask:
+      // generalize the businesses guard so every array endpoint is protected).
+      const live =
+        !allowEmptyLive && Array.isArray(fetched) && fetched.length === 0
+          ? null
+          : fetched;
       const settle = () => {
         if (cancelled) return;
         if (live !== null) {

@@ -19,10 +19,24 @@ import {
   PdfLangPicker,
 } from "@/components/report/pdf-lang-picker";
 import type { PdfLang } from "@/components/shell/app-state";
+import { apiPostResult, isLive } from "@/components/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnChip } from "@/components/ui/conn";
 import { useToast } from "@/components/ui/toast";
+
+/** EP-006 response (`POST /api/report/:auditId`). */
+interface PdfResponse {
+  pdf_path: string;
+  storage_url: string;
+}
+
+/** Generated-PDF state: live carries the signed URL; mock carries neither. */
+interface PdfDone {
+  lang: PdfLang;
+  url: string | null;
+  pdfPath: string | null;
+}
 
 /** manovedh_GMB_Audit_41_<lang>.pdf — EP-006 names it server-side; UI mirrors. */
 function pdfNameFor(lang: PdfLang): string {
@@ -57,9 +71,11 @@ export default function ReportPage() {
   const [isClient, setIsClient] = useState(report.business.is_client);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfChooserOpen, setPdfChooserOpen] = useState(false);
-  const [pdfDoneLang, setPdfDoneLang] = useState<PdfLang | null>(null);
+  const [pdfDone, setPdfDone] = useState<PdfDone | null>(null);
   const [waOpen, setWaOpen] = useState(false);
   const [waSentAt, setWaSentAt] = useState<string | null>(null);
+  /** EP-007 answered FEATURE_DISABLED — WA keys land next week. */
+  const [waSoon, setWaSoon] = useState(false);
 
   // Workspace pages carry full data for the fixture business only (mock phase).
   if (!bizSelIsFixture) {
@@ -136,21 +152,66 @@ export default function ReportPage() {
   // CR-3: Generate PDF opens the language chooser first (per-business memory).
   const pdfLang = pdfLangFor(bizSel.id);
 
-  const genPdf = (lang: PdfLang) => {
+  // B3: real EP-006 — POST /api/report/:auditId { language }. Registry key
+  // "/api/report" stays OFF until MAIN flips (FEATURE_PDF); the mock path
+  // keeps the staged demo feel. Returns the PdfDone it settled on.
+  const genPdf = async (lang: PdfLang): Promise<PdfDone> => {
     setPdfChooserOpen(false);
     setPdfLang(bizSel.id, lang);
     setPdfBusy(true);
-    // EP-006 request would carry { lang } here on Day 5.
-    setTimeout(() => {
+    const r = await apiPostResult<PdfResponse>(
+      `/api/report/${report.audit.id}`,
+      { language: lang },
+    );
+    const done: PdfDone = r.ok
+      ? { lang, url: r.data.storage_url, pdfPath: r.data.pdf_path }
+      : { lang, url: null, pdfPath: null };
+    const finish = () => {
       setPdfBusy(false);
-      setPdfDoneLang(lang);
-      toast(`PDF ready — ${pdfNameFor(lang)} · ${PDF_LANG_LABEL[lang]}`);
-    }, 1300);
+      setPdfDone(done);
+      toast(
+        done.url
+          ? `PDF ready — open or download · ${PDF_LANG_LABEL[lang]}`
+          : `PDF ready — ${pdfNameFor(lang)} · ${PDF_LANG_LABEL[lang]}`,
+      );
+    };
+    if (r.ok) finish();
+    else await new Promise<void>((res) => setTimeout(() => (finish(), res()), 1300));
+    return done;
   };
 
-  const sendWa = (_phone: string, lang: PdfLang) => {
+  /** 2-line summary that travels with the PDF (EP-007 body). */
+  const waSummary = (lang: PdfLang) =>
+    lang === "en"
+      ? `${report.business.name} — Google score ${report.scores.total}/100. Full audit report attached.`
+      : `${report.business.name} — Google स्कोअर ${report.scores.total}/100. संपूर्ण ऑडिट रिपोर्ट सोबत जोडली आहे.`;
+
+  // B3: real EP-007 — POST /api/wa/send { phone, pdf_path, summary }.
+  // FEATURE_DISABLED (keys land next week) → graceful "arriving soon" state;
+  // registry OFF → demo-mode mock success (unchanged behaviour).
+  const sendWa = async (phone: string, lang: PdfLang) => {
     setPdfLang(bizSel.id, lang);
     setWaOpen(false);
+    // Ensure a PDF exists for this language first (live path only).
+    let pdfPath = pdfDone?.lang === lang ? pdfDone.pdfPath : null;
+    if (isLive("/api/wa/send") && !pdfPath) {
+      pdfPath = (await genPdf(lang)).pdfPath;
+    }
+    const r = await apiPostResult<{ sent: true; wa_message_id: string }>(
+      "/api/wa/send",
+      {
+        phone: `+91${phone.replace(/\D/g, "")}`,
+        pdf_path: pdfPath ?? pdfNameFor(lang),
+        summary: waSummary(lang),
+      },
+    );
+    if (!r.ok && r.code === "FEATURE_DISABLED") {
+      setWaSoon(true);
+      toast("WhatsApp sending arrives with next week's keys — PDF saved ✓");
+      return;
+    }
+    // Live success — or demo-mode mock success while the registry is OFF.
+    setWaSoon(false);
     setWaSentAt(
       new Date().toLocaleString("en-IN", {
         day: "2-digit",
@@ -218,10 +279,21 @@ export default function ReportPage() {
               ? "Generating PDF…"
               : `Generate PDF (${PDF_LANG_LABEL[pdfLang]})`}
           </Button>
-          {pdfDoneLang && !pdfBusy && (
-            <span className="self-center whitespace-nowrap text-[11.5px] font-semibold text-band-good">
-              ✓ PDF · {PDF_LANG_LABEL[pdfDoneLang]}
-            </span>
+          {pdfDone && !pdfBusy && (
+            pdfDone.url ? (
+              <a
+                href={pdfDone.url}
+                target="_blank"
+                rel="noreferrer"
+                className="self-center whitespace-nowrap rounded-chip bg-band-good-bg px-[10px] py-1 text-[11.5px] font-bold text-band-good underline-offset-2 hover:underline"
+              >
+                ✓ PDF · {PDF_LANG_LABEL[pdfDone.lang]} · Open ↗
+              </a>
+            ) : (
+              <span className="self-center whitespace-nowrap text-[11.5px] font-semibold text-band-good">
+                ✓ PDF · {PDF_LANG_LABEL[pdfDone.lang]}
+              </span>
+            )
           )}
           <Button variant="secondary" onClick={() => setWaOpen(true)}>
             Send on WhatsApp
@@ -229,6 +301,11 @@ export default function ReportPage() {
           {waSentAt && (
             <span className="self-center whitespace-nowrap text-[11.5px] font-semibold text-band-good">
               ✓ sent {waSentAt}
+            </span>
+          )}
+          {waSoon && (
+            <span className="self-center whitespace-nowrap rounded-chip bg-band-warn-bg px-[10px] py-1 text-[11.5px] font-semibold text-band-warn">
+              WhatsApp arriving soon — PDF saved
             </span>
           )}
           {capHit ? (

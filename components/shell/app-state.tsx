@@ -8,7 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { BusinessListItem, SpendToday } from "@/types";
+import type { BusinessListItem, PdfLanguage, SpendToday } from "@/types";
 import {
   apiFetchResult,
   setLiveDataDisabledHandler,
@@ -20,8 +20,8 @@ import {
   spendTodayMock,
 } from "@/components/mocks/spend";
 
-/** CR-3 — EP-006 PDF language (shim until PdfLanguage lands in @/types). */
-export type PdfLang = "mr" | "en" | "hinglish";
+/** CR-3 — EP-006 PDF language (now the official contract type). */
+export type PdfLang = PdfLanguage;
 
 interface AppState {
   /** All businesses — live `/api/businesses` when flipped, mock fallback. */
@@ -66,13 +66,9 @@ export function AppStateProvider({
     delayMs: 0,
   });
   const spendQ = useApiGet("/api/spend/today", spendTodayMock, { delayMs: 0 });
-  // An empty live list ([]) is NOT null, so it slips past `?? mock` — guard it
-  // so bizSel is always valid and the shell never white-screens. (A genuinely
-  // empty account is a Day-7 go-live concern — flagged in HANDOFF.)
-  const businesses =
-    businessesQ.data && businessesQ.data.length > 0
-      ? businessesQ.data
-      : businessesMock;
+  // Empty-live-array protection now lives inside useApiGet (default on),
+  // so `data` is either a non-empty live list or null → mock.
+  const businesses = businessesQ.data ?? businessesMock;
 
   const [bizSelId, setBizSelId] = useState(businessesMock[0].id);
   const [capPreview, setCapPreview] = useState(initialCapPreview);
@@ -103,7 +99,8 @@ export function AppStateProvider({
     void apiFetchResult("/api/settings", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ dataforseo_live: on }),
+      // Contract field name (Settings type + validateSettingsPatch) — B2 fix.
+      body: JSON.stringify({ dataforseo_live_enabled: on }),
     });
   }, []);
 
