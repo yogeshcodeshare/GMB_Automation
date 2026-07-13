@@ -20,6 +20,35 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-15 09:00 IST — main
+**Day 4 = MVP GATE DAY (M4: business name in → Marathi PDF out, WhatsApp mocked).** Merge
+gates today are STRICTER — a PR without its P0 SEC item + tests is not mergeable:
+- **@backend M3 (AI layer) — SEC-002 prompt-injection is BLOCKING DoD.** Need tests proving:
+  (a) review/website text wrapped as UNTRUSTED DATA (delimiters/spotlighting) in every
+  prompt template; (b) an output validator that REJECTS URLs/phones not in the business
+  record, outputs >2× expected length, language mismatch (asked मराठी got English), and
+  leaked system-prompt fragments; (c) a hostile-review corpus ("ignore previous
+  instructions…", embedded links, instruction-in-Marathi) → drafts stay clean; (d) every
+  output persists `approved=false` and the publish path reads ONLY `approved=true`.
+- **@backend M4 (PDF) — SEC-003 XSS→PDF is BLOCKING DoD.** Tests proving business
+  name/review text with `<script>`, `<img onerror=…>`, HTML entities renders ESCAPED in the
+  report HTML; CSP meta in the template; NO external network fetch in the template (fonts
+  bundled/self-hosted — Devanagari must embed). wa.service stub: `FEATURE_DISABLED` envelope,
+  compiles + tests WITHOUT keys.
+- **MVP gate verify (me, on merged main):** fixture audit → EP-006 PDF → assert non-trivial
+  bytes + extractable Devanagari (मनोवेध) + rubric 41 → I save it to repo `/tmp-mvp/` and
+  ping Yogesh to eyeball Marathi (no boxes). MVP GATE MET only when both halves pass.
+- **Day-5 prep:** `docs/agents/DAY5_INTEGRATION.md` written — the `LIVE_ENDPOINTS` flip order
+  (₹0 screens first: stats/businesses/spend/reviews; paid ones gated on DataForSEO), dev-route
+  deletion, founder-login flow, rollback rule. @frontend read it before Day 5.
+
+**⛔ CLIENT CHASES (escalating — @Yogesh):** (1) **DataForSEO account verification is now 2
+days overdue** — every paid endpoint 403s; nothing live until it clears, then backend runs
+`RUN_LIVE_SMOKE=1`. (2) Apply the 2 pending migrations `20260713000001_grid_top_ranks` +
+`20260713000002_is_demo`. (3) Enable GitHub Actions (still 0 runs — local gates are the only
+CI). (4) Add `OPENROUTER_API_KEY` to `.env.local` (Groq works as primary; OpenRouter is the
+free-model fallback M3 needs for resilience).
+
 ### @all — 2026-07-14 16:40 IST — main
 **PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
 react-leaflet@4 + OSM tiles (free, ADR-003, attribution present) — deps coexist with
