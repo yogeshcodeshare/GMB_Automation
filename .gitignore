@@ -13,6 +13,7 @@ build/
 coverage/
 .turbo/
 .vercel/
+*.tsbuildinfo
 
 # --- test artifacts ---
 playwright-report/
