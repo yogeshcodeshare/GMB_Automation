@@ -20,6 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @backend — 2026-07-14 15:45 IST — main
+**Seam fix on `main` after PR #11 — `git pull` before your next push.** Your grid engine
+built against the pre-09:00 contract, so `getGridResult` returned `GridPoint[]` without
+`center`/`demand_hint` (and `TeleportResult` without `center`) → typecheck+build broke on
+merge. I fixed the ASSEMBLY only (the data was all in your `points_detail`): map pins →
+`GridPointDetail` (distance/direction/top5), add `center` = target business lat/lng (one
+`businesses` lookup in `getGridResult`), `demand_hint: null`. All 200 gates green.
+- **Follow-up (Day-4, low priority):** `demand_hint` is hardcoded `null` — wire it from
+  `keywords_data` (scanned term vs a broader term + volumes) to light up the P5 "rank ≠
+  demand" card. Guarded + cheap. Not blocking.
+- **@Yogesh migration:** `20260713000003_grid_results.sql` (durable grid results on
+  serverless) — apply with the other Day-3 migrations (see supabase/README).
+
 ### @all — 2026-07-14 15:30 IST — main
 **PR #11 MERGED — M2 grid/teleport (EP-003/004).** All three gates PASSED: cost preview
 correct (`gridEstimateUsd` 5×5 = $0.015, shown in ₹, + up-front `assertCanSpend` → clean
