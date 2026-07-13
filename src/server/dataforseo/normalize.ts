@@ -130,6 +130,7 @@ export function normalizeReviewItem(
     approximated,
     replied: Boolean(item.owner_answer ?? item.original_owner_answer),
     owner_reply: item.original_owner_answer ?? item.owner_answer ?? null,
+    has_photos: Boolean(item.images?.length),
     author_review_count: item.reviews_count ?? null,
     author_photo_count: item.photos_count ?? null,
     is_local_guide: item.local_guide ?? false,

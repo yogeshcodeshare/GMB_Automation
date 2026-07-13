@@ -56,6 +56,8 @@ export interface NormalizedReview {
   approximated: boolean; // dates >1yr are approximated — UI must label this
   replied: boolean;
   owner_reply: string | null;
+  /** The review's own attached photos (not the author's lifetime count). */
+  has_photos: boolean;
   author_review_count: number | null;
   author_photo_count: number | null;
   is_local_guide: boolean;
