@@ -13,6 +13,10 @@ import { apiGet } from "@/components/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
+import {
+  LiveDataBlockedButton,
+  LiveDataOffNote,
+} from "@/components/ui/live-data";
 
 /** Search results state: hidden until first search. */
 type SearchState = "idle" | "searching" | "results" | "none";
@@ -47,7 +51,9 @@ const CAPTION_CLASS =
 
 export default function NewAuditPage() {
   const router = useRouter();
-  const { capHit } = useAppState();
+  const { capHit, liveDataEnabled } = useAppState();
+  // CR-1: DataForSEO search + audit are paid — blocked when live data is off.
+  const liveBlocked = !liveDataEnabled;
 
   // Card 1 — find the business
   const [name, setName] = useState("");
@@ -72,10 +78,14 @@ export default function NewAuditPage() {
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   // "Re-audit · ₹1.9" from P3 lands here with ?rerun=1 → prefill + auto-run.
+  // Guarded by the same paid-action gates as the buttons: a direct hit
+  // (bookmark/refresh/back after toggling live data off) must NOT auto-run.
   useEffect(() => {
     if (
       new URLSearchParams(window.location.search).get("rerun") === "1" &&
-      !running
+      !running &&
+      !capHit &&
+      liveDataEnabled
     ) {
       setName(candidatesMock[0].name);
       setCandidates(candidatesMock);
@@ -238,15 +248,36 @@ export default function NewAuditPage() {
             placeholder="City"
             className="min-w-[110px] flex-1 rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[14px] py-3 text-[14.5px] outline-brand"
           />
-          <Button
-            variant="dark"
-            size="md"
-            onClick={doSearch}
-            loading={search === "searching"}
-          >
-            Search
-          </Button>
+          {capHit ? (
+            <button
+              type="button"
+              disabled
+              title="Daily cap reached — resumes tomorrow"
+              className="cursor-not-allowed rounded-[10px] bg-[#E5E1D8] px-[22px] py-3 text-[13.5px] font-semibold text-ink-faint"
+            >
+              Search
+            </button>
+          ) : liveBlocked ? (
+            <button
+              type="button"
+              disabled
+              title="DataForSEO live data is off — enable it in Settings"
+              className="cursor-not-allowed rounded-[10px] border border-[#C9D2DB] bg-[#EEF1F4] px-[22px] py-3 text-[13.5px] font-semibold text-[#8697A6]"
+            >
+              Search
+            </button>
+          ) : (
+            <Button
+              variant="dark"
+              size="md"
+              onClick={doSearch}
+              loading={search === "searching"}
+            >
+              Search
+            </Button>
+          )}
         </div>
+        {!capHit && liveBlocked && <LiveDataOffNote className="mt-[10px]" />}
 
         {search === "results" && (
           <div className="mt-4 flex flex-col gap-2">
@@ -391,6 +422,8 @@ export default function NewAuditPage() {
               Daily cap reached — resumes tomorrow
             </div>
           </div>
+        ) : liveBlocked ? (
+          <LiveDataBlockedButton label="Run audit →" size="lg" align="right" />
         ) : (
           <Button
             size="lg"

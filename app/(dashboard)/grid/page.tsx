@@ -24,6 +24,7 @@ import {
 import { MiniGrid } from "@/components/grid/mini-grid";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { LiveDataOffNote } from "@/components/ui/live-data";
 import { useToast } from "@/components/ui/toast";
 
 const GridMap = dynamic(() => import("@/components/grid/grid-map"), {
@@ -69,7 +70,9 @@ function rankBandClasses(v: number): string {
 export default function GridPage() {
   const router = useRouter();
   const toast = useToast();
-  const { bizSel, setBizSelId, capHit } = useAppState();
+  const { bizSel, setBizSelId, bizSelIsFixture, capHit, liveDataEnabled } =
+    useAppState();
+  const liveBlocked = !liveDataEnabled;
   const result = gridJulResultMock;
 
   const [keyword, setKeyword] = useState(result.scan.keyword);
@@ -84,7 +87,7 @@ export default function GridPage() {
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  if (bizSel.id !== auditReportMock.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div
@@ -171,6 +174,17 @@ export default function GridPage() {
           >
             Scan paused
           </button>
+        ) : liveBlocked ? (
+          <div>
+            <button
+              disabled
+              title="DataForSEO live data is off — enable it in Settings"
+              className="cursor-not-allowed rounded-[9px] border border-[#C9D2DB] bg-[#EEF1F4] px-5 py-[11px] text-[13.5px] font-bold text-[#8697A6]"
+            >
+              Run scan
+            </button>
+            <LiveDataOffNote className="mt-[5px]" />
+          </div>
         ) : (
           <button
             type="button"
@@ -315,6 +329,14 @@ export default function GridPage() {
                   className="mt-[9px] cursor-not-allowed rounded-[7px] border-[1.5px] border-[rgba(27,35,33,0.10)] bg-bg-app px-[13px] py-[7px] text-[12px] font-semibold text-ink-faint"
                 >
                   Paused — cap reached
+                </button>
+              ) : liveBlocked ? (
+                <button
+                  disabled
+                  title="DataForSEO live data is off — enable it in Settings"
+                  className="mt-[9px] cursor-not-allowed rounded-[7px] border border-[#C9D2DB] bg-[#EEF1F4] px-[13px] py-[7px] text-[12px] font-semibold text-[#8697A6]"
+                >
+                  Live data off
                 </button>
               ) : (
                 <button
@@ -510,19 +532,28 @@ export default function GridPage() {
                   </span>{" "}
                   — scan the money keyword too.
                 </div>
-                {!capHit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setKeyword(keywordDemandMock[1].keyword);
-                      runScan();
-                    }}
-                    className="mt-[9px] rounded-[7px] border-[1.5px] border-brand bg-bg-surface px-[13px] py-[7px] text-[12px] font-semibold text-brand hover:bg-[#F0F5F2]"
-                  >
-                    Scan &quot;{keywordDemandMock[1].keyword}&quot; ·{" "}
-                    <span className="font-mono">₹{gridCostInr[5]}</span>
-                  </button>
-                )}
+                {!capHit &&
+                  (liveBlocked ? (
+                    <button
+                      disabled
+                      title="DataForSEO live data is off — enable it in Settings"
+                      className="mt-[9px] cursor-not-allowed rounded-[7px] border border-[#C9D2DB] bg-[#EEF1F4] px-[13px] py-[7px] text-[12px] font-semibold text-[#8697A6]"
+                    >
+                      Live data off
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyword(keywordDemandMock[1].keyword);
+                        runScan();
+                      }}
+                      className="mt-[9px] rounded-[7px] border-[1.5px] border-brand bg-bg-surface px-[13px] py-[7px] text-[12px] font-semibold text-brand hover:bg-[#F0F5F2]"
+                    >
+                      Scan &quot;{keywordDemandMock[1].keyword}&quot; ·{" "}
+                      <span className="font-mono">₹{gridCostInr[5]}</span>
+                    </button>
+                  ))}
               </Card>
             </div>
           </div>

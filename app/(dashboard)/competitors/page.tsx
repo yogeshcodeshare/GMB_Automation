@@ -15,6 +15,7 @@ import { businessShortNames } from "@/components/mocks/businesses";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { LiveDataOffNote } from "@/components/ui/live-data";
 import { useToast } from "@/components/ui/toast";
 
 const MAX_COMPETITORS = 4;
@@ -92,7 +93,9 @@ const ROWS: MetricRow[] = [
 export default function CompetitorsPage() {
   const router = useRouter();
   const toast = useToast();
-  const { bizSel, setBizSelId, capHit } = useAppState();
+  const { bizSel, setBizSelId, bizSelIsFixture, capHit, liveDataEnabled } =
+    useAppState();
+  const liveBlocked = !liveDataEnabled;
   const report = auditReportMock;
 
   const [columns, setColumns] = useState<CompetitorCompareRow[]>(
@@ -108,7 +111,7 @@ export default function CompetitorsPage() {
   const competitorCount = columns.length - 1;
   const atMax = competitorCount >= MAX_COMPETITORS;
 
-  if (bizSel.id !== report.business.id) {
+  if (!bizSelIsFixture) {
     return (
       <div className="flex max-w-[560px] flex-col items-start gap-2 rounded-card border-[1.5px] border-dashed border-[rgba(27,35,33,0.22)] bg-bg-surface px-6 py-7">
         <div
@@ -181,6 +184,24 @@ export default function CompetitorsPage() {
           <span className="whitespace-nowrap rounded-chip bg-bg-app px-3 py-[5px] text-[11.5px] font-semibold text-ink-soft">
             {competitorCount} competitors · max
           </span>
+        ) : capHit ? (
+          <button
+            type="button"
+            disabled
+            title="Daily cap reached"
+            className="cursor-not-allowed whitespace-nowrap rounded-lg border-[1.5px] border-[rgba(27,35,33,0.10)] bg-bg-app px-[14px] py-[7px] text-[12.5px] font-semibold text-ink-faint"
+          >
+            + Add paused
+          </button>
+        ) : liveBlocked ? (
+          <button
+            type="button"
+            disabled
+            title="DataForSEO live data is off — enable it in Settings"
+            className="cursor-not-allowed whitespace-nowrap rounded-lg border border-[#C9D2DB] bg-[#EEF1F4] px-[14px] py-[7px] text-[12.5px] font-semibold text-[#8697A6]"
+          >
+            + Add competitor
+          </button>
         ) : (
           <button
             type="button"
@@ -197,6 +218,14 @@ export default function CompetitorsPage() {
             className="cursor-not-allowed whitespace-nowrap rounded-lg border-[1.5px] border-[rgba(27,35,33,0.10)] bg-bg-app px-[14px] py-[7px] text-[12.5px] font-semibold text-ink-faint"
           >
             Refresh paused
+          </button>
+        ) : liveBlocked ? (
+          <button
+            disabled
+            title="DataForSEO live data is off — enable it in Settings"
+            className="cursor-not-allowed whitespace-nowrap rounded-lg border border-[#C9D2DB] bg-[#EEF1F4] px-[14px] py-[7px] text-[12.5px] font-semibold text-[#8697A6]"
+          >
+            Refresh · live data off
           </button>
         ) : refreshing ? (
           <button
@@ -228,6 +257,10 @@ export default function CompetitorsPage() {
           {inPdf ? "✓ In PDF" : "Include in PDF"}
         </button>
       </Card>
+
+      {!capHit && liveBlocked && (
+        <LiveDataOffNote className="-mt-2 px-1" />
+      )}
 
       {/* Compare table */}
       <Card className="overflow-hidden">

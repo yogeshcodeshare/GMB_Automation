@@ -2,23 +2,33 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { PdfLang } from "@/components/shell/app-state";
+import {
+  PDF_LANG_LABEL,
+  PdfLangPicker,
+} from "./pdf-lang-picker";
 
 /**
  * WhatsApp send modal — +91 phone input, recent chips, PDF attachment
- * preview, Cancel/Send (EP-007 on Day 5; feature-flagged until keys arrive).
+ * preview with a CR-3 language chooser, Cancel/Send (EP-007 on Day 5;
+ * feature-flagged until keys arrive).
  */
 export function WaModal({
-  pdfName,
+  pdfNameFor,
+  initialLang,
   recent,
   onClose,
   onSend,
 }: {
-  pdfName: string;
+  /** Filename for the chosen language (mirrors EP-006 naming). */
+  pdfNameFor: (lang: PdfLang) => string;
+  initialLang: PdfLang;
   recent: string[];
   onClose: () => void;
-  onSend: (phone: string) => void;
+  onSend: (phone: string, lang: PdfLang) => void;
 }) {
   const [phone, setPhone] = useState("");
+  const [lang, setLang] = useState<PdfLang>(initialLang);
   const valid = phone.replace(/\D/g, "").length >= 10;
 
   return (
@@ -69,18 +79,26 @@ export function WaModal({
             </button>
           ))}
         </div>
+        <PdfLangPicker
+          value={lang}
+          onChange={setLang}
+          className="mb-3"
+        />
         <div className="mb-[14px] flex items-center gap-[9px] rounded-[9px] bg-bg-app px-3 py-[9px]">
           <span className="flex h-9 w-[30px] flex-none items-center justify-center rounded-[5px] bg-band-crit text-[8.5px] font-bold text-white">
             PDF
           </span>
           <div className="min-w-0">
             <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold">
-              {pdfName}
+              {pdfNameFor(lang)}
             </div>
             <div className="text-[11px] text-ink-faint">
-              + 2-line Marathi summary
+              {lang === "en" ? "+ 2-line English summary" : "+ 2-line Marathi summary"}
             </div>
           </div>
+          <span className="ml-auto flex-none rounded-chip bg-bg-surface px-2 py-[2px] text-[10.5px] font-bold text-ink-soft">
+            {PDF_LANG_LABEL[lang]}
+          </span>
         </div>
         <div className="flex justify-end gap-2">
           <button
@@ -93,7 +111,7 @@ export function WaModal({
           <button
             type="button"
             disabled={!valid}
-            onClick={() => onSend(phone)}
+            onClick={() => onSend(phone, lang)}
             className={cn(
               "rounded-lg px-5 py-[9px] text-[13px] font-semibold",
               valid
