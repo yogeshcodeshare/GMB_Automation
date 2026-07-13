@@ -9,7 +9,8 @@ export type AiToolType =
   | "qa"
   | "fb_post"
   | "festival"
-  | "category";
+  | "category"
+  | "fixes"; // top-fixes AI redraft (M3); persists like other tools (approved=false)
 
 export type Tone = "warm" | "professional";
 

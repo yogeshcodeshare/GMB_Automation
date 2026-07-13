@@ -21,6 +21,9 @@ interface AppState {
   /** Settings → "Preview cap-hit state" toggle (P11). */
   capPreview: boolean;
   setCapPreview: (on: boolean) => void;
+  /** Category Finder → "Apply to audit" (updates P3 chips + fix #1). */
+  catApplied: boolean;
+  setCatApplied: (on: boolean) => void;
   userName: string;
   userEmail: string;
 }
@@ -37,6 +40,7 @@ export function AppStateProvider({
 }) {
   const [bizSelId, setBizSelId] = useState(businessesMock[0].id);
   const [capPreview, setCapPreview] = useState(initialCapPreview);
+  const [catApplied, setCatApplied] = useState(false);
 
   const value = useMemo<AppState>(() => {
     const spend = capPreview ? spendTodayCapHitMock : spendTodayMock;
@@ -49,10 +53,12 @@ export function AppStateProvider({
       capHit: spend.blocked,
       capPreview,
       setCapPreview,
+      catApplied,
+      setCatApplied,
       userName: "Founder",
       userEmail: "founder@agency.in",
     };
-  }, [bizSelId, capPreview]);
+  }, [bizSelId, capPreview, catApplied]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

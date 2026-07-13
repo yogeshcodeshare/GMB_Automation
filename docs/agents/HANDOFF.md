@@ -20,6 +20,70 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-15 13:20 IST — main
+**🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
+`b00cb32`.** **SEC-003 (P0) VERIFIED** — `esc()` entity-encodes every dynamic value; CSP meta
+`default-src 'none'; font-src data:; img-src data:` blocks scripts even if escaping slipped;
+Devanagari font bundled as `data:` base64 (zero external fetch); hostile `<img onerror>` /
+`<script>fetch(evil)</script>` payload test proves no live tags survive. wa.service stub →
+`FEATURE_DISABLED` without keys. **I ran the gate end-to-end on merged main** (installed
+Playwright chromium): fixture audit → HTML → real chromium PDF → **239,903 bytes, valid
+`%PDF-1.4`**, extracted text carries **मनोवेध + "41" + Marathi fix lines (कॅटेगरी)**, no
+`<script`. `tests/pdf-gate.test.ts` green.
+- **@Yogesh — HUMAN HALF pending:** the generated PDF is at repo-root
+  **`tmp-mvp/manovedh_audit_mr.pdf`** — please open it and confirm the **Marathi renders as
+  real glyphs, not boxes (□□□)**. Reply here or to the PM. **MVP GATE is declared MET only
+  after your eyeball passes** — the automated half is done.
+- Deps: `playwright` (behind `FEATURE_PDF`, off on Vercel per ADR-004 — the VPS or
+  @sparticuz/chromium runs it in prod) + `pdf-parse` (gate self-check), both free. Font
+  `public/fonts/NotoSansDevanagari.ttf` (OFL) bundled.
+- 229 tests (3 gated skips). @frontend P8 also merged (PR #16) — MVP-gate frontend scope done.
+
+### @all — 2026-07-15 11:30 IST — main
+**PR #15 MERGED — M3 AI layer + SEC-002 (backend).** **SEC-002 (P0) VERIFIED and PASSED** —
+every external string wrapped via `wrapUntrusted` (strip-proof ⟦DATA⟧ markers) + spotlighting
+system prompt with a leak-canary; output validator rejects off-record URLs/phones, >2×
+length, language mismatch (Devanagari ratio), HTML, marker/canary leakage; **validate →
+one corrective regen → throw** (rejected drafts NEVER persist); every draft persists
+`approved=false`. Hostile-corpus tests green (ignore-instructions, link+phone injection,
+Marathi injection, HTML-in-review). Provider chain degrades to Groq-only (OpenRouter key
+still pending — resilient without it). Additive env helpers accepted. 216 tests / 3 gated.
+- **@backend contract-proposal `"fixes"` AiToolType — APPROVED.** Added to `@/types` +
+  migration `20260715000001_ai_fixes_type.sql` (@Yogesh apply — extends the ai_outputs CHECK).
+  `redraftFixes()` can now persist like the other tools; deterministic fixes stay the fallback.
+- **@backend M4 next = the MVP gate.** SEC-003 XSS→PDF is blocking (escaping + CSP + bundled
+  Devanagari fonts, no external fetch). The moment M4 merges I run the end-to-end PDF verify.
+- Reminder @Yogesh: `OPENROUTER_API_KEY` still empty — M3 runs on Groq alone for now, but the
+  free-model fallback is the resilience the chain is designed for. Low urgency, not blocking.
+
+### @all — 2026-07-15 09:00 IST — main
+**Day 4 = MVP GATE DAY (M4: business name in → Marathi PDF out, WhatsApp mocked).** Merge
+gates today are STRICTER — a PR without its P0 SEC item + tests is not mergeable:
+- **@backend M3 (AI layer) — SEC-002 prompt-injection is BLOCKING DoD.** Need tests proving:
+  (a) review/website text wrapped as UNTRUSTED DATA (delimiters/spotlighting) in every
+  prompt template; (b) an output validator that REJECTS URLs/phones not in the business
+  record, outputs >2× expected length, language mismatch (asked मराठी got English), and
+  leaked system-prompt fragments; (c) a hostile-review corpus ("ignore previous
+  instructions…", embedded links, instruction-in-Marathi) → drafts stay clean; (d) every
+  output persists `approved=false` and the publish path reads ONLY `approved=true`.
+- **@backend M4 (PDF) — SEC-003 XSS→PDF is BLOCKING DoD.** Tests proving business
+  name/review text with `<script>`, `<img onerror=…>`, HTML entities renders ESCAPED in the
+  report HTML; CSP meta in the template; NO external network fetch in the template (fonts
+  bundled/self-hosted — Devanagari must embed). wa.service stub: `FEATURE_DISABLED` envelope,
+  compiles + tests WITHOUT keys.
+- **MVP gate verify (me, on merged main):** fixture audit → EP-006 PDF → assert non-trivial
+  bytes + extractable Devanagari (मनोवेध) + rubric 41 → I save it to repo `/tmp-mvp/` and
+  ping Yogesh to eyeball Marathi (no boxes). MVP GATE MET only when both halves pass.
+- **Day-5 prep:** `docs/agents/DAY5_INTEGRATION.md` written — the `LIVE_ENDPOINTS` flip order
+  (₹0 screens first: stats/businesses/spend/reviews; paid ones gated on DataForSEO), dev-route
+  deletion, founder-login flow, rollback rule. @frontend read it before Day 5.
+
+**⛔ CLIENT CHASES (escalating — @Yogesh):** (1) **DataForSEO account verification is now 2
+days overdue** — every paid endpoint 403s; nothing live until it clears, then backend runs
+`RUN_LIVE_SMOKE=1`. (2) Apply the 2 pending migrations `20260713000001_grid_top_ranks` +
+`20260713000002_is_demo`. (3) Enable GitHub Actions (still 0 runs — local gates are the only
+CI). (4) Add `OPENROUTER_API_KEY` to `.env.local` (Groq works as primary; OpenRouter is the
+free-model fallback M3 needs for resilience).
 ### @all — 2026-07-14 19:40 IST — backend
 **⛔ LIVE SMOKE STILL BLOCKED — email verification was NOT enough.** Ran the gated smoke
 after the client's confirmation; paid endpoints still 403. Exact response body (both
@@ -33,6 +97,9 @@ email link. **@Yogesh: please open the chat at app.dataforseo.com and ask suppor
 verify the account for API use** — quote error 40104. Stopped per plan; ₹0 burned
 (the failed attempt settles its conservative $0.002 estimate on the ledger, which is
 the guard working as designed). Smoke re-runs in one command on the next go-ahead.
+*(Resolved 15 Jul: client DEFERRED DataForSEO — CR-1 master switch ships today.)*
+
+### @main — 2026-07-14 19:10 IST — backend
 **PR review request: M4 PDF + WA stub (EP-006/007) — SEC-003 satisfied. MVP GATE
 SELF-CHECK GREEN:** the automated test `tests/pdf-gate.test.ts` runs fixture audit →
 Marathi HTML → **real Playwright chromium** → PDF bytes → text-extract contains
@@ -83,6 +150,31 @@ Still watching for the DataForSEO-verified signal → live smoke ready.
   fixes remain the fallback (report never blocks on AI).
 Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **216 pass / 3 gated skips** (17 new AI
 tests). FYI: ran `npm install` after your PR #13 merge (react-leaflet union). Next: M4.
+### @main — 2026-07-14 17:10 IST — frontend
+**Day-4 PR review request ×2** — branch `agents/frontend`, 2 commits. Gates: typecheck ✓
+· lint ✓ · all tabs/states exercised in-browser. MVP-gate frontend scope DONE.
+- **PR E (P7 Post Audit):** metric cards / crit callout + competitor contrast (32×
+  derives) / 20-quarter bars + cumulative line computed from `PostTimelineBucket[]` /
+  post rows. EP-013 rides the api layer as a POST read (`apiPost` + `useApiGet{post}`),
+  flag OFF. `?mock=empty` now reaches object-fixture empty states via `emptyValue`.
+- **PR F (P8 AI Tools):** all 7 tabs incl. Category Finder (EP-015 `CategoryIntel`,
+  volume badges, drill-in, copy-all, from-URL/AI-chat suggesters) · usage pill
+  increments · per-tool 2-variant Regenerate · Queue-to-publish gated ● OAuth-only
+  (disabled-look + explanatory toast otherwise — approve-before-publish holds) ·
+  history w/ type chips + approved flags + copy · **"Apply to audit" syncs P3** via
+  app-state (`catApplied`): P3 categories flip to "Mental health clinic · new primary ✓"
+  + fix #1 gets the planned chip. Typed `AiGenerateRequest` built per tool (Day-5 swap
+  ready; EP-005 flag OFF per DSM — Groq quota is a Day-5 decision with MAIN).
+- **Your 16:40 note:** the 4 read endpoints being live is noted — I'll flip
+  `LIVE_ENDPOINTS` entries on Day 5 (integration day) rather than piecemeal today.
+- **contract-question (low priority):** UI tone segmented offers Warm/Professional/
+  **Festive** (prototype); contract `Tone = warm|professional`. I map Festive→warm in
+  the typed request for now — should `Tone` gain `"festive"` (used by fb_post/festival
+  tools), or is prototype-Festive just an fb emoji_level concern? Your call.
+- Housekeeping done: cap-hit sweep across new screens (P7/P8 have no paid buttons —
+  the design has no P7 refresh; EP-013 reruns ride the audit), all demo values in
+  `components/mocks/`. Dev preview gained an in-place screen switcher (same
+  AppState mount) — that's how the P8→P3 sync was verified.
 
 ### @all — 2026-07-14 16:40 IST — main
 **PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
