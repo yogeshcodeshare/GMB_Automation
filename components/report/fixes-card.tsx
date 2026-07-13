@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { TopFixes } from "@/types";
+import { useAppState } from "@/components/shell/app-state";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 
@@ -13,6 +14,7 @@ type Lang = "mr" | "en";
  * carry into the PDF).
  */
 export function FixesCard({ topFixes }: { topFixes: TopFixes[] }) {
+  const { catApplied } = useAppState();
   const [lang, setLang] = useState<Lang>("mr");
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -91,7 +93,14 @@ export function FixesCard({ topFixes }: { topFixes: TopFixes[] }) {
                   </div>
                 </>
               ) : (
-                <div className="text-[14px] leading-[1.55]">{text}</div>
+                <>
+                  <div className="text-[14px] leading-[1.55]">{text}</div>
+                  {i === 0 && catApplied && (
+                    <span className="mt-[6px] inline-block rounded-chip bg-band-good-bg px-[9px] py-[3px] text-[10.5px] font-bold text-band-good">
+                      ✓ Planned via Category Finder
+                    </span>
+                  )}
+                </>
               )}
             </div>
             {editIdx !== i && (

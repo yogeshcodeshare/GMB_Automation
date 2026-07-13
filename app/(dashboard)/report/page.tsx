@@ -26,7 +26,7 @@ const CAPTION =
 export default function ReportPage() {
   const router = useRouter();
   const toast = useToast();
-  const { bizSel, setBizSelId, capHit } = useAppState();
+  const { bizSel, setBizSelId, capHit, catApplied } = useAppState();
   const report = auditReportMock;
 
   const [isClient, setIsClient] = useState(report.business.is_client);
@@ -240,12 +240,26 @@ export default function ReportPage() {
           <div className="mt-4">
             <div className={cn(CAPTION, "mb-2")}>Categories</div>
             <div className="flex flex-wrap gap-[6px]">
-              <span
-                title='Generic — competitors use "Mental health clinic"'
-                className="rounded-chip border border-[rgba(179,55,43,0.25)] bg-band-crit-bg px-[10px] py-1 text-[12px] font-semibold text-band-crit"
-              >
-                {report.categories.primary} · primary ✕
-              </span>
+              {catApplied ? (
+                <>
+                  <span
+                    title="Planned via Category Finder"
+                    className="rounded-chip border border-[rgba(23,123,75,0.25)] bg-band-good-bg px-[10px] py-1 text-[12px] font-semibold text-band-good"
+                  >
+                    Mental health clinic · new primary ✓
+                  </span>
+                  <span className="rounded-chip bg-bg-app px-[10px] py-1 text-[12px] font-medium text-ink-soft line-through">
+                    {report.categories.primary}
+                  </span>
+                </>
+              ) : (
+                <span
+                  title='Generic — competitors use "Mental health clinic"'
+                  className="rounded-chip border border-[rgba(179,55,43,0.25)] bg-band-crit-bg px-[10px] py-1 text-[12px] font-semibold text-band-crit"
+                >
+                  {report.categories.primary} · primary ✕
+                </span>
+              )}
               {report.categories.secondary.map((c) => (
                 <span
                   key={c}

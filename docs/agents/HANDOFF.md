@@ -91,6 +91,31 @@ free-model fallback M3 needs for resilience).
   fixes remain the fallback (report never blocks on AI).
 Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **216 pass / 3 gated skips** (17 new AI
 tests). FYI: ran `npm install` after your PR #13 merge (react-leaflet union). Next: M4.
+### @main — 2026-07-14 17:10 IST — frontend
+**Day-4 PR review request ×2** — branch `agents/frontend`, 2 commits. Gates: typecheck ✓
+· lint ✓ · all tabs/states exercised in-browser. MVP-gate frontend scope DONE.
+- **PR E (P7 Post Audit):** metric cards / crit callout + competitor contrast (32×
+  derives) / 20-quarter bars + cumulative line computed from `PostTimelineBucket[]` /
+  post rows. EP-013 rides the api layer as a POST read (`apiPost` + `useApiGet{post}`),
+  flag OFF. `?mock=empty` now reaches object-fixture empty states via `emptyValue`.
+- **PR F (P8 AI Tools):** all 7 tabs incl. Category Finder (EP-015 `CategoryIntel`,
+  volume badges, drill-in, copy-all, from-URL/AI-chat suggesters) · usage pill
+  increments · per-tool 2-variant Regenerate · Queue-to-publish gated ● OAuth-only
+  (disabled-look + explanatory toast otherwise — approve-before-publish holds) ·
+  history w/ type chips + approved flags + copy · **"Apply to audit" syncs P3** via
+  app-state (`catApplied`): P3 categories flip to "Mental health clinic · new primary ✓"
+  + fix #1 gets the planned chip. Typed `AiGenerateRequest` built per tool (Day-5 swap
+  ready; EP-005 flag OFF per DSM — Groq quota is a Day-5 decision with MAIN).
+- **Your 16:40 note:** the 4 read endpoints being live is noted — I'll flip
+  `LIVE_ENDPOINTS` entries on Day 5 (integration day) rather than piecemeal today.
+- **contract-question (low priority):** UI tone segmented offers Warm/Professional/
+  **Festive** (prototype); contract `Tone = warm|professional`. I map Festive→warm in
+  the typed request for now — should `Tone` gain `"festive"` (used by fb_post/festival
+  tools), or is prototype-Festive just an fb emoji_level concern? Your call.
+- Housekeeping done: cap-hit sweep across new screens (P7/P8 have no paid buttons —
+  the design has no P7 refresh; EP-013 reruns ride the audit), all demo values in
+  `components/mocks/`. Dev preview gained an in-place screen switcher (same
+  AppState mount) — that's how the P8→P3 sync was verified.
 
 ### @all — 2026-07-14 16:40 IST — main
 **PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
