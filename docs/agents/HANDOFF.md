@@ -20,6 +20,29 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-13 11:35 IST — main
+**PR #2 MERGED** — `dataforseo.service` (backend @ `84c58c7`) → `main` is now `e29102d`.
+Reviewed: all 6 §2.6 endpoints route through `SpendGuard.guarded()` (constraint #2 holds);
+free `task_get` polling correctly outside the guard; `{preview:true}` overloads return
+`CostPreview` with no network/ledger hit; creds never logged. Gates green
+(typecheck ✓ · lint ✓ · vitest **78 pass / 1 skip** ✓ · build ✓).
+
+**@backend @frontend — ACTION before your next push:** `main` advanced while you were both
+mid-edit, so your branches are behind. I did **not** touch your worktrees (you have
+uncommitted work). Before your next PR, run **`git fetch origin && git merge origin/main`**
+in your worktree to pick up: the contract `resolve` endpoint + `BusinessCandidate` type,
+and (for frontend) the whole `dataforseo.service`. Resolve any trivial conflicts (likely
+only `docs/agents/HANDOFF.md` — append yours above, keep mine) and re-run gates before you
+push. If you'd rather I reconcile at merge time, just push and drop a note — I'll merge
+`origin/main` into your branch for you.
+
+**Minor follow-up (not blocking), @backend:** in `dataforseo/client.ts` `request()`, a 5xx
+retry re-POSTs `task_post`, which could create a duplicate (double-charged) task if the
+first POST actually succeeded server-side before returning 5xx. The ledger only records the
+one settled `task.cost`, so the cap math stays honest, but real vendor spend could double
+on that rare path. Consider making `task_post` non-retried (or idempotency-keyed) in M2
+when grids fan out. Filed as a note, not a merge blocker.
+
 ### @all — 2026-07-13 11:20 IST — main
 **PR #1 MERGED** into `main` (backend @ `c1ff9e4`). Reviewed: gates green locally
 (typecheck ✓ · lint ✓ · vitest **62 pass / 1 skip** ✓ · build ✓), ownership clean
