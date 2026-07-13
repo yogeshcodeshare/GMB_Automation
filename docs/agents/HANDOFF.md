@@ -20,6 +20,29 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-16 09:00 IST — main
+**DAY 5 = INTEGRATION DAY. DB IS CURRENT — no more schema blockers.** Client applied all 3
+migrations; I verified them LIVE (`tests/schema-sanity.test.ts`): `grid_points.top_ranks` ✓,
+`businesses.is_demo` (6 seed rows flagged) ✓, `ai_outputs` accepts `'fixes'` ✓. GitHub
+Actions now enabled (CI fires on this push). **🎯 MVP GATE MET** — Yogesh approved the PDF
+(both halves pass). @all: `git merge origin/main` before your next push.
+- **⛔ DataForSEO is STILL 403 (40104) — the email step was NOT enough** (see backend 19:40
+  note). Per that, the account needs the in-panel/support verification, not just the email
+  link. **Consequence for today:** the ₹0/DB integration flips (stats, businesses, spend,
+  reviews) proceed now; the PAID flips (resolve, audit, posts, grid) stay MOCK-gated until
+  DFS clears. @Yogesh: open the support chat at app.dataforseo.com, quote 40104.
+- **CR-1 shipped (migration + type):** **`20260716000001_dataforseo_live_enabled.sql`** —
+  adds `settings.dataforseo_live_enabled` boolean (default **false**) + the field on the
+  `Settings` type. Runtime kill-switch: even once the account verifies, live calls stay OFF
+  until the founder flips this. @Yogesh apply the migration. **@backend — wire the enforcement:**
+  read `settings.dataforseo_live_enabled` in the dfs client's PAID path and refuse with a clear
+  disabled error when false (free balance ping unaffected). Small change; needed before any
+  live flip.
+- **@frontend — flip the ₹0 registry keys now** per `DAY5_INTEGRATION.md`:
+  `/api/dashboard/stats`, `/api/businesses`, `/api/spend/today`, `/api/reviews` → `true`
+  (mock fallback stays). Verify each against the live seed data, one commit per flip.
+- CR-2 / CR-3: awaiting specs from the PM — will relay when defined.
+
 ### @all — 2026-07-15 13:20 IST — main
 **🎯 MVP GATE — AUTOMATED HALF MET. PR #17 (M4 pdf.service + wa stub) MERGED → `main`
 `b00cb32`.** **SEC-003 (P0) VERIFIED** — `esc()` entity-encodes every dynamic value; CSP meta
@@ -84,6 +107,20 @@ days overdue** — every paid endpoint 403s; nothing live until it clears, then 
 `20260713000002_is_demo`. (3) Enable GitHub Actions (still 0 runs — local gates are the only
 CI). (4) Add `OPENROUTER_API_KEY` to `.env.local` (Groq works as primary; OpenRouter is the
 free-model fallback M3 needs for resilience).
+### @all — 2026-07-14 19:40 IST — backend
+**⛔ LIVE SMOKE STILL BLOCKED — email verification was NOT enough.** Ran the gated smoke
+after the client's confirmation; paid endpoints still 403. Exact response body (both
+`my_business_info/live` AND `task_post`, verbatim from the API):
+`HTTP 403 · status_code 40104 · "Please verify your account before using the API. You
+can complete verification in the user panel: https://app.dataforseo.com/ ."`
+Free `appendix/user_data` works fine (balance $1 visible), so credentials are good —
+the ACCOUNT still lacks API verification. DataForSEO's flow typically wants the
+in-panel verification step (phone/identity or a support-chat unlock), not just the
+email link. **@Yogesh: please open the chat at app.dataforseo.com and ask support to
+verify the account for API use** — quote error 40104. Stopped per plan; ₹0 burned
+(the failed attempt settles its conservative $0.002 estimate on the ledger, which is
+the guard working as designed). Smoke re-runs in one command on the next go-ahead.
+
 ### @main — 2026-07-14 19:10 IST — backend
 **PR review request: M4 PDF + WA stub (EP-006/007) — SEC-003 satisfied. MVP GATE
 SELF-CHECK GREEN:** the automated test `tests/pdf-gate.test.ts` runs fixture audit →

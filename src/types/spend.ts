@@ -22,4 +22,7 @@ export interface Settings {
   public_daily_limit: number;
   per_ip_limit: number;
   model_chain: string[];
+  /** CR-1 kill-switch — paid DataForSEO calls are refused unless true (default false),
+   *  independent of account verification. Free calls (balance ping) are unaffected. */
+  dataforseo_live_enabled: boolean;
 }

@@ -10,7 +10,11 @@ DDL, so the two migrations are applied once by hand (2 minutes):
 5. **Day-3 additions** — paste and **Run** each: `migrations/20260713000001_grid_top_ranks.sql`
    (per-point rank packs — powers the P5 grid popovers + ownership; grid degrades gracefully
    without it) and `migrations/20260713000002_is_demo.sql` (demo-flush flag).
-6. Verify: `npm run m0:verify` → all checks PASS, and `npm run test:rls` → green.
+6. **Day-4/5 additions** — paste and **Run**: `migrations/20260715000001_ai_fixes_type.sql`
+   (AI `fixes` tool type) and `migrations/20260716000001_dataforseo_live_enabled.sql`
+   (CR-1 live kill-switch, default off).
+7. Verify: `npm run m0:verify` → all checks PASS, `npm run test:rls` → green, and
+   `npx vitest run tests/schema-sanity.test.ts` → the 3 schema-migration probes green.
 
 Then create the founder login (once):
 
