@@ -30,6 +30,7 @@ export interface RankEntry {
   reviews: number | null;
   cid: string | null;
   is_target: boolean;
+  area?: string; // optional locality under the name in the teleport top-10 (P5 display)
 }
 
 /** Pin-click popover (P5): rank + top-5 at that point + distance.

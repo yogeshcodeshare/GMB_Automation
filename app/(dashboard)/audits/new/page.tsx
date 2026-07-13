@@ -9,6 +9,7 @@ import {
   candidatesMock,
   searchCandidatesMock,
 } from "@/components/mocks/candidates";
+import { apiGet } from "@/components/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -95,13 +96,19 @@ export default function NewAuditPage() {
   const doSearch = () => {
     setSearch("searching");
     setSel(0);
-    timers.current.push(
-      setTimeout(() => {
-        const found = searchCandidatesMock(name);
+    // GET /api/businesses/resolve once flipped live (LIVE_ENDPOINTS);
+    // typed mock resolver until then.
+    void (async () => {
+      const live = await apiGet<BusinessCandidate[]>(
+        `/api/businesses/resolve?name=${encodeURIComponent(name)}&city=${encodeURIComponent(city)}`,
+      );
+      const settle = () => {
+        const found = live ?? searchCandidatesMock(name);
         setCandidates(found);
         setSearch(found.length ? "results" : "none");
-      }, 350),
-    );
+      };
+      timers.current.push(setTimeout(settle, live !== null ? 0 : 350));
+    })();
   };
 
   const runAudit = () => {

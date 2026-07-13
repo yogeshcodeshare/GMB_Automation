@@ -50,7 +50,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-011 | `POST /api/gbp/post` · `POST /api/gbp/reply` | `{ business_id; ai_output_id }` | `{ published: true; gbp_ref: string }` (flag off → FEATURE_DISABLED) | M6 |
 | EP-012 | `GET /api/spend/today` | — | `SpendToday` | **M0 ✅** |
 | EP-013 | `POST /api/posts-audit` | `{ preview?; business_id }` | `CostPreview` \| `{ stats: PostAuditStats; posts: PostItem[]; timeline: PostTimelineBucket[] }` | M1 |
-| EP-014 | `POST /api/website-audit` | `{ preview?; business_id }` | `CostPreview` \| `WebsiteAuditDetail` | M1.5 |
+| EP-014 | `POST /api/website-audit` | `{ preview?; business_id }` | `CostPreview` \| `WebsiteAuditDetail` (`summary.psi_desktop?` optional) | M1.5 |
 | EP-015 | `GET /api/categories/related?kw=` | — | `CategoryIntel` | M1 |
 | EP-016 | `GET /api/gbp/keywords/:businessId` | — | `Array<{ keyword: string; impressions: number }>` | M6 |
 | EP-017 | `POST /api/media/inbox` (n8n webhook, secret header) · `POST /api/gbp/media/:id/publish` | — | `MediaInboxItem` · `{ published: true }` | M9 |

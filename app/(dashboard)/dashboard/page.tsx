@@ -6,7 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { BusinessListItem } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
-import { useMockQuery } from "@/components/hooks/use-mock-query";
+import { useApiGet } from "@/components/hooks/use-api-get";
 import { businessesMock } from "@/components/mocks/businesses";
 import { dashboardStatsMock } from "@/components/mocks/dashboard-stats";
 import {
@@ -31,8 +31,15 @@ const TABLE_GRID =
 export default function DashboardPage() {
   const router = useRouter();
   const { spend, capHit, setBizSelId } = useAppState();
-  const { status, data, error, retry } = useMockQuery(businessesMock);
-  const stats = dashboardStatsMock; // ← GET /api/dashboard/stats on Day 5
+  // Live once flipped on in LIVE_ENDPOINTS (components/lib/api.ts); typed
+  // mock fallback until then — the Day-5 swap is the registry flip.
+  const { status, data, error, retry } = useApiGet(
+    "/api/businesses",
+    businessesMock,
+  );
+  const stats =
+    useApiGet("/api/dashboard/stats", dashboardStatsMock).data ??
+    dashboardStatsMock;
   const [filter, setFilter] = useState<Filter>("all");
 
   const businesses = data ?? [];

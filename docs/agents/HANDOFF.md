@@ -20,6 +20,22 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-14 16:40 IST — main
+**PR #13 MERGED — P5 Grid (Leaflet + OSM) + typed API layer (frontend).** Leaflet +
+react-leaflet@4 + OSM tiles (free, ADR-003, attribution present) — deps coexist with
+`undici` (package.json unioned). `components/lib/api.ts` + `useApiGet` = typed
+`ApiResponse` fetch with a `LIVE_ENDPOINTS` registry (all false = mock) — Day-5 swap is one
+flag flip per endpoint. P2 manual entry is CID-first (actioned my relay). Both frontend
+contract-proposals **APPROVED** and added to `@/types` + contract:
+- `WebsiteAuditSummary.psi_desktop?: number | null` (optional — P3b mobile+desktop gauges;
+  @backend fill from PSI desktop strategy when convenient, null till then).
+- `RankEntry.area?: string` (optional teleport-top-10 locality; @backend fill from the pack).
+- **@backend — the 4 read endpoints frontend will flip live** (`/api/businesses/resolve`,
+  `/api/dashboard/stats`, `/api/businesses`, `/api/reviews/:id`) are all merged + on `main`
+  now — @frontend you can flip their `LIVE_ENDPOINTS` entries whenever (Day-5 integration).
+- FYI the `next build` clobbers `.next` while `next dev` runs — known (I hit it too);
+  `rm -rf .next && npm run dev` fixes. Don't run a prod build against a live dev server.
+
 ### @all — 2026-07-14 16:15 IST — main
 **PR #12 MERGED — M2 grid reworked to the locked contract (backend, see 16:05 note below).**
 The backend **course-corrected to the directed approach**: `grid_scans.results` dropped;
@@ -228,6 +244,31 @@ Propose migration: `alter table grid_scans add column results jsonb` (stores own
 table, per-point top-5, weak direction at scan time). I'll code with a graceful fallback
 (column absent → base row only) so nothing blocks on the migration timing.
 *(→ RESOLVED at top 10:30: use `grid_points.top_ranks`, derive aggregates on read.)*
+### @main — 2026-07-13 13:45 IST — frontend
+**Day-3 PR review request ×2** — branch `agents/frontend` @ `HEAD`, 4 commits on top of
+your merge base. Gates: typecheck ✓ · lint ✓ · **build ✓** · every screen exercised
+in-browser (grid + teleport + all states). Day-3 list is COMPLETE incl. the P5 stretch.
+- **PR C (P4 + P3b + data-policy):** `chore(data-policy)` + `feat(P4+P3b)`. Client data
+  policy applied repo-wide: every demo value now lives in `components/mocks/` (P1 KPIs on
+  the new `DashboardStats` type — thanks for arbitrating), screens read mocks/props only.
+  P4 winner/flag cells DERIVE from audit data (no hardcoded cell states). P2 manual
+  fallback is CID-first per the client note (bare place_id can't run). Tailwind
+  `duration-[600ms]` warn fixed.
+- **PR D (P6 + P5 + fetch layer):** P6 Review Inbox (drafts rewrite by lang/tone,
+  approve gated by connection — approve-before-publish holds) · P5 Grid on REAL
+  Leaflet + react-leaflet@4 + OSM tiles w/ '© OpenStreetMap contributors' attribution
+  (new deps in package.json — additive, lockfile committed) · `components/lib/api.ts`
+  + `useApiGet`: typed ApiResponse fetch layer with mock fallback behind a
+  **LIVE_ENDPOINTS registry** (all false). @backend: when `/api/businesses/resolve`,
+  `/api/dashboard/stats`, `/api/businesses`, `/api/reviews/:id` are merged+live, post
+  here — my swap is flipping the registry entry, nothing else.
+Two small contract-proposals (display fields, low priority):
+1. `WebsiteAuditSummary.psi_desktop: number | null` — DSM asked for mobile+desktop PSI
+   gauges; contract has mobile only (desktop is a marked mock till arbitrated).
+2. `RankEntry.area?: string` — teleport top-10 shows the locality under each name
+   (prototype does); currently a display-only mock map.
+FYI: don't run `next build` while the dev server is up — it clobbers `.next` and the dev
+server 500s with phantom module errors until restart (hit it today; restart fixes).
 
 ### @all — 2026-07-13 13:15 IST — main
 **PR #6 MERGED** (backend repo score-fix + gated live-smoke/access-probe tests) → `main`

@@ -18,6 +18,7 @@ export interface WebsiteAuditSummary extends WebsiteAudit {
   url: string;
   rented_subdomain: boolean; // grexa/wixsite/blogspot detector (MS1-T10)
   provider: string | null;
+  psi_desktop?: number | null; // PSI desktop strategy (P3b mobile+desktop gauges); optional/null until backend wires it
 }
 
 export type NapField = "name" | "address" | "phone";
