@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/components/shell/app-state";
 import { auditReportMock } from "@/components/mocks/audit-report";
+import { recommendedPrimaryCategoryMock } from "@/components/mocks/ai-tools";
 import { SEEDED_AUDIT_ID } from "@/components/mocks/businesses";
 import { useApiGet } from "@/components/hooks/use-api-get";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,11 +36,6 @@ interface PdfDone {
   lang: PdfLang;
   url: string | null;
   pdfPath: string | null;
-}
-
-/** manovedh_GMB_Audit_41_<lang>.pdf — EP-006 names it server-side; UI mirrors. */
-function pdfNameFor(lang: PdfLang): string {
-  return `मनोवेध_GMB_Audit_41_${lang}.pdf`;
 }
 
 const CAPTION =
@@ -152,6 +148,11 @@ export default function ReportPage() {
   // CR-3: Generate PDF opens the language chooser first (per-business memory).
   const pdfLang = pdfLangFor(bizSel.id);
 
+  // EP-006 names the file server-side; the UI mirrors it from the report
+  // being viewed (sweep fix: name + score were hardcoded fixture literals).
+  const pdfNameFor = (lang: PdfLang) =>
+    `${report.business.name}_GMB_Audit_${report.scores.total}_${lang}.pdf`;
+
   // UAT-5: saved contacts for THIS business only — the owner captured via
   // Mark-as-Client / the client record. No fabricated numbers; contacts
   // supplied by demo data are badged DEMO. (Once UAT-2's is_demo lands on
@@ -181,7 +182,8 @@ export default function ReportPage() {
       `/api/report/${report.audit.id}`,
       { language: lang },
     );
-    if (r.ok) {
+    // MAIN's UAT-1 gate: "PDF ready" ONLY on ok + a real storage_url.
+    if (r.ok && r.data.storage_url) {
       const done: PdfDone = {
         lang,
         url: r.data.storage_url,
@@ -193,11 +195,20 @@ export default function ReportPage() {
       if (autoOpen && done.url) window.open(done.url, "_blank", "noopener");
       return done;
     }
-    if (r.code !== "ENDPOINT_OFF") {
-      // Live EP-006 failure — show the actual message, stop the spinner,
-      // and do NOT fake a done chip.
+    if (r.ok) {
       setPdfBusy(false);
-      toast(`PDF failed — ${r.message}`);
+      toast("Couldn't generate the PDF — no download link returned");
+      return null;
+    }
+    if (r.code !== "ENDPOINT_OFF") {
+      // Live EP-006 failure — clear error toast, stop the spinner, and do
+      // NOT fake a done chip (messages per MAIN's Day-7 triage).
+      setPdfBusy(false);
+      toast(
+        r.code === "FEATURE_DISABLED"
+          ? "PDF generation is off — restart the server (FEATURE_PDF)"
+          : `Couldn't generate the PDF — ${r.message}`,
+      );
       return null;
     }
     // Registry OFF → staged demo-mode success (mock path, no URL).
@@ -262,6 +273,11 @@ export default function ReportPage() {
       toast("WhatsApp sending arrives with next week's keys — PDF saved ✓");
       return;
     }
+    if (!r.ok && r.code !== "ENDPOINT_OFF") {
+      // Live EP-007 failure — never fake a sent chip (MAIN's UAT-1 note).
+      toast(`Couldn't send on WhatsApp — ${r.message}`);
+      return;
+    }
     // Live success — or demo-mode mock success while the registry is OFF.
     setWaSoon(false);
     setWaSentAt(
@@ -277,8 +293,24 @@ export default function ReportPage() {
     toast("Report sent on WhatsApp ✓");
   };
 
+  const isDemoAudit = report.source === "demo" || report.is_demo === true;
+
   return (
     <section className="flex flex-col gap-[14px]">
+      {/* UAT-2 — persistent provenance banner for demo audits */}
+      {isDemoAudit && (
+        <div className="flex flex-wrap items-center gap-[10px] rounded-card border border-[#C9D2DB] bg-[#EEF1F4] px-4 py-[10px]">
+          <span className="rounded-chip bg-[#4A5A6A] px-[9px] py-[3px] text-[10.5px] font-bold uppercase tracking-[0.6px] text-white">
+            Demo data
+          </span>
+          <span className="min-w-0 flex-1 text-[12px] font-medium leading-relaxed text-[#4A5A6A]">
+            This report was generated from synthetic demo data (₹0, no
+            DataForSEO calls). Enable live data in Settings and re-audit for
+            real Google data.
+          </span>
+        </div>
+      )}
+
       {/* Header card */}
       <Card className="flex flex-col gap-3 px-5 py-[18px]">
         <div className="flex flex-wrap items-start justify-between gap-[14px]">
@@ -471,7 +503,7 @@ export default function ReportPage() {
                     title="Planned via Category Finder"
                     className="rounded-chip border border-[rgba(23,123,75,0.25)] bg-band-good-bg px-[10px] py-1 text-[12px] font-semibold text-band-good"
                   >
-                    Mental health clinic · new primary ✓
+                    {recommendedPrimaryCategoryMock} · new primary ✓
                   </span>
                   <span className="rounded-chip bg-bg-app px-[10px] py-1 text-[12px] font-medium text-ink-soft line-through">
                     {report.categories.primary}
@@ -479,7 +511,7 @@ export default function ReportPage() {
                 </>
               ) : (
                 <span
-                  title='Generic — competitors use "Mental health clinic"'
+                  title={`Generic — competitors use "${recommendedPrimaryCategoryMock}"`}
                   className="rounded-chip border border-[rgba(179,55,43,0.25)] bg-band-crit-bg px-[10px] py-1 text-[12px] font-semibold text-band-crit"
                 >
                   {report.categories.primary} · primary ✕

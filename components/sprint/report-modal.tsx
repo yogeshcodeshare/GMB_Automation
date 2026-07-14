@@ -50,7 +50,12 @@ export function SprintReportModal({
         toast("WhatsApp sending arrives with next week's keys — PDF saved ✓");
         return;
       }
-      // Registry OFF / network — demo-mode mock success.
+      if (res.code !== "ENDPOINT_OFF") {
+        // Live EP-022 failure — clear error, never a fake sent chip (UAT-1).
+        toast(`Couldn't generate the report — ${res.message}`);
+        return;
+      }
+      // Registry OFF — demo-mode mock success.
       setSent(true);
       toast(`Report sent on WhatsApp ✓ · ${PDF_LANG_LABEL[lang]}`);
       return;

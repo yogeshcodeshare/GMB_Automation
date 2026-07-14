@@ -13,10 +13,7 @@ import { apiGet } from "@/components/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
-import {
-  LiveDataBlockedButton,
-  LiveDataOffNote,
-} from "@/components/ui/live-data";
+import { DemoDataBadge, DemoRunNote } from "@/components/ui/live-data";
 
 /** Search results state: hidden until first search. */
 type SearchState = "idle" | "searching" | "results" | "none";
@@ -32,16 +29,16 @@ const STAGES: Array<{ key: AuditStage; label: string; caption: string }> = [
     label: "Reviews",
     caption: "Pulling the latest 30 reviews + reply history",
   },
-  { key: "posts", label: "Posts", caption: "my_business_updates — 7 posts found" },
+  { key: "posts", label: "Posts", caption: "my_business_updates — post history" },
   {
     key: "competitors",
     label: "Competitors",
-    caption: "Comparing 3 nearby competitors",
+    caption: "", // interpolated from the Top 3/Top 5 option at render
   },
   {
     key: "website",
     label: "Website",
-    caption: "PageSpeed + on-page checks (grexa.site)",
+    caption: "PageSpeed + on-page checks",
   },
   { key: "scoring", label: "Scoring", caption: "Applying the /100 rubric" },
 ];
@@ -52,8 +49,10 @@ const CAPTION_CLASS =
 export default function NewAuditPage() {
   const router = useRouter();
   const { capHit, liveDataEnabled } = useAppState();
-  // CR-1: DataForSEO search + audit are paid — blocked when live data is off.
-  const liveBlocked = !liveDataEnabled;
+  // UAT-2: live data off no longer blocks the flow — the audit runs in demo
+  // mode instead (EP-001 mode:"demo" — ₹0, zero vendor calls, is_demo=true).
+  // Cap-hit still blocks (it gates the LIVE pipeline; precedence unchanged).
+  const demoMode = !liveDataEnabled;
 
   // Card 1 — find the business
   const [name, setName] = useState("");
@@ -106,12 +105,15 @@ export default function NewAuditPage() {
   const doSearch = () => {
     setSearch("searching");
     setSel(0);
-    // GET /api/businesses/resolve once flipped live (LIVE_ENDPOINTS);
-    // typed mock resolver until then.
+    // GET /api/businesses/resolve once flipped live (LIVE_ENDPOINTS). In
+    // demo mode the paid resolver is skipped entirely — labeled synthetic
+    // candidates come from the local generator (UAT-2).
     void (async () => {
-      const live = await apiGet<BusinessCandidate[]>(
-        `/api/businesses/resolve?name=${encodeURIComponent(name)}&city=${encodeURIComponent(city)}`,
-      );
+      const live = demoMode
+        ? null
+        : await apiGet<BusinessCandidate[]>(
+            `/api/businesses/resolve?name=${encodeURIComponent(name)}&city=${encodeURIComponent(city)}`,
+          );
       const settle = () => {
         const found = live ?? searchCandidatesMock(name);
         setCandidates(found);
@@ -121,10 +123,29 @@ export default function NewAuditPage() {
     })();
   };
 
+  // Sweep fix: the staged run only shows stages the founder actually chose
+  // (Website audit: No / Post audit: No used to render + tick anyway).
+  const stages = STAGES.filter(
+    (s) =>
+      (s.key !== "website" || web === "Yes") &&
+      (s.key !== "posts" || post === "Yes"),
+  ).map((s) =>
+    s.key === "competitors"
+      ? { ...s, caption: `Comparing ${comp === "Top 3" ? 3 : 5} nearby competitors` }
+      : s,
+  );
+
+  // The Search control's enabled condition — the Enter-key path in the name
+  // and city inputs uses the SAME gate as the button (sweep fix: Enter used
+  // to bypass the cap-hit gate and fire the paid resolver).
+  const canSearch = !(capHit && !demoMode);
+
   const runAudit = () => {
     // Typed exactly like the Day-5 EP-001 call so the swap is mechanical.
     // Manual mode prefers CID — EP-001 rejects a bare place_id (backend FYI 13 Jul).
     const request: AuditRequest = {
+      // UAT-2 locked contract: live data off → the synthetic pipeline.
+      mode: demoMode ? "demo" : "live",
       name: candidates[sel]?.name ?? name,
       city,
       cid: manual && cid ? cid : (candidates[sel]?.cid ?? undefined),
@@ -139,9 +160,11 @@ export default function NewAuditPage() {
     void request; // handed to POST /api/audit on Day 5
     setRunning(true);
     setStage(0);
-    for (let i = 1; i <= 5; i++)
+    for (let i = 1; i < stages.length; i++)
       timers.current.push(setTimeout(() => setStage(i), i * 950));
-    timers.current.push(setTimeout(() => router.push("/report"), 5850));
+    timers.current.push(
+      setTimeout(() => router.push("/report"), stages.length * 950 + 150),
+    );
   };
 
   const cancelAudit = () => {
@@ -152,17 +175,23 @@ export default function NewAuditPage() {
   };
 
   const runTargetName = candidates[sel]?.name ?? name.trim() ?? "";
-  const pct = ((Math.min(6, stage + 0.6) / 6) * 100).toFixed(0);
+  const pct = (
+    (Math.min(stages.length, stage + 0.6) / stages.length) *
+    100
+  ).toFixed(0);
 
   if (running) {
     return (
       <section className="flex max-w-[780px] flex-col gap-[14px]">
         <Card className="max-w-[560px] px-[22px] py-5">
-          <div className="mb-[2px] text-[15.5px] font-bold">
+          <div className="mb-[2px] flex flex-wrap items-center gap-2 text-[15.5px] font-bold">
             Auditing &quot;{runTargetName}&quot;…
+            {demoMode && <DemoDataBadge />}
           </div>
           <div className="mb-[14px] text-[12.5px] text-ink-soft">
-            ~2–4 min · the report saves automatically when done
+            {demoMode
+              ? "Demo pipeline — synthetic data, ₹0, no DataForSEO calls"
+              : "~2–4 min · the report saves automatically when done"}
           </div>
           <div className="mb-[14px] h-[6px] overflow-hidden rounded-[3px] bg-[#EDEAE3]">
             <div
@@ -171,7 +200,7 @@ export default function NewAuditPage() {
             />
           </div>
           <div className="flex flex-col">
-            {STAGES.map((st, i) => {
+            {stages.map((st, i) => {
               const done = stage > i;
               const current = stage === i;
               return (
@@ -237,18 +266,18 @@ export default function NewAuditPage() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            onKeyDown={(e) => e.key === "Enter" && canSearch && doSearch()}
             placeholder="Business name"
             className="min-w-[200px] flex-[2] rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[14px] py-3 text-[14.5px] outline-brand"
           />
           <input
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            onKeyDown={(e) => e.key === "Enter" && canSearch && doSearch()}
             placeholder="City"
             className="min-w-[110px] flex-1 rounded-[10px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[14px] py-3 text-[14.5px] outline-brand"
           />
-          {capHit ? (
+          {!canSearch ? (
             <button
               type="button"
               disabled
@@ -257,16 +286,9 @@ export default function NewAuditPage() {
             >
               Search
             </button>
-          ) : liveBlocked ? (
-            <button
-              type="button"
-              disabled
-              title="DataForSEO live data is off — enable it in Settings"
-              className="cursor-not-allowed rounded-[10px] border border-[#C9D2DB] bg-[#EEF1F4] px-[22px] py-3 text-[13.5px] font-semibold text-[#8697A6]"
-            >
-              Search
-            </button>
           ) : (
+            // UAT-2: demo mode searches too — the paid resolver is skipped
+            // and labeled synthetic candidates come back instead.
             <Button
               variant="dark"
               size="md"
@@ -277,12 +299,14 @@ export default function NewAuditPage() {
             </Button>
           )}
         </div>
-        {!capHit && liveBlocked && <LiveDataOffNote className="mt-[10px]" />}
+        {demoMode && <DemoRunNote className="mt-[10px]" />}
 
         {search === "results" && (
           <div className="mt-4 flex flex-col gap-2">
             <div className={cn(CAPTION_CLASS, "tracking-[0.8px]")}>
-              {candidates.length} matches on Google — pick one
+              {demoMode
+                ? `${candidates.length} demo matches (synthetic) — pick one`
+                : `${candidates.length} matches on Google — pick one`}
             </div>
             {candidates.map((c, i) => {
               const selected = sel === i;
@@ -322,6 +346,7 @@ export default function NewAuditPage() {
                       {c.rating.toFixed(1)}★ · {c.reviews_total ?? 0} reviews
                     </span>
                   )}
+                  {demoMode && <DemoDataBadge className="flex-none" />}
                 </button>
               );
             })}
@@ -404,16 +429,20 @@ export default function NewAuditPage() {
         </div>
       </Card>
 
-      {/* Card 3 — live cost preview */}
+      {/* Card 3 — live cost preview (₹0 in demo mode) */}
       <Card className="flex flex-wrap items-center justify-between gap-[14px] px-5 py-4">
         <div>
           <div className={cn(CAPTION_CLASS, "mb-[2px]")}>Estimated cost</div>
-          <div className="font-mono text-[22px] font-semibold">₹{estCost}</div>
+          <div className="font-mono text-[22px] font-semibold">
+            {demoMode ? "₹0" : `₹${estCost}`}
+          </div>
           <div className="text-[12px] text-ink-soft">
-            ~2–4 min · charged only when the audit runs
+            {demoMode
+              ? "demo audit — synthetic data, no DataForSEO spend"
+              : "~2–4 min · charged only when the audit runs"}
           </div>
         </div>
-        {capHit ? (
+        {capHit && !demoMode ? (
           <div className="text-right">
             <Button size="lg" disabled>
               Run audit →
@@ -422,21 +451,22 @@ export default function NewAuditPage() {
               Daily cap reached — resumes tomorrow
             </div>
           </div>
-        ) : liveBlocked ? (
-          <LiveDataBlockedButton label="Run audit →" size="lg" align="right" />
         ) : (
-          <Button
-            size="lg"
-            onClick={runAudit}
-            disabled={search !== "results" && !(manual && cid.trim())}
-            title={
-              search !== "results" && !(manual && cid.trim())
-                ? "Search and pick a business (or enter a CID) first"
-                : undefined
-            }
-          >
-            Run audit →
-          </Button>
+          <div className={cn(demoMode && "text-right")}>
+            <Button
+              size="lg"
+              onClick={runAudit}
+              disabled={search !== "results" && !(manual && cid.trim())}
+              title={
+                search !== "results" && !(manual && cid.trim())
+                  ? "Search and pick a business (or enter a CID) first"
+                  : undefined
+              }
+            >
+              {demoMode ? "Run demo audit →" : "Run audit →"}
+            </Button>
+            {demoMode && <DemoRunNote className="mt-[5px]" align="right" />}
+          </div>
         )}
       </Card>
     </section>
