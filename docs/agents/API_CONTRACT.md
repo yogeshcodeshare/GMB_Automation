@@ -60,7 +60,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-021 | `POST /api/sprint` · `PATCH /api/sprint/:id` · `GET /api/sprint?businessId=` · `GET /api/sprint/:id` | `SprintStartRequest` · `SprintPatchRequest` | `SprintDetail` (`?businessId=` → `SprintDetail \| null`; `:id` → `SprintDetail`) | M6 |
 | — | `GET /api/sprint/prereqs?businessId=` | — | `SprintPrereqs` (US-024 gate — 5 checks + `eligible` + `active_sprint_id`) | M6 |
 | EP-022 | `POST /api/sprint/:id/report` | `SprintReportRequest` | `SprintReportResponse` (partial when no after-audit) | M6 |
-| — | `GET /api/businesses/resolve?name=&city=` | — | `BusinessCandidate[]` (P2 picker; one guarded serp/maps call ~$0.0006; cost preview via `?preview=1`) | M1 |
+| — | `GET /api/businesses/resolve?name=&city=` (`&mode=demo`) | — | `BusinessCandidate[]` (P2 picker; live = one guarded serp/maps call ~$0.0006, preview via `?preview=1`; **`mode=demo` → labeled synthetic candidates, ₹0, no vendor call**) | M1 · UAT-2 |
 | — | `GET /api/dashboard/stats` | — | `DashboardStats` (P1 KPI strip; derived from existing tables, ₹0) | M1 |
 | — | `GET /api/businesses` · `GET /api/businesses/:id` | — | `BusinessListItem[]` · `Business` | M1 |
 | — | `PATCH /api/businesses/:id` | `Partial<Pick<Business, "is_client" \| "plan" \| "owner_name" \| "owner_whatsapp">>` | `Business` | M1 |
