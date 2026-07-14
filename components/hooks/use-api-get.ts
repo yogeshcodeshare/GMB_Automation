@@ -15,7 +15,9 @@ export function useApiGet<T>(
   path: string,
   fallback: T,
   {
-    delayMs = 400,
+    // UAT-3: keep the mock-fallback skeleton flash short — 100ms reads as
+    // instant while still avoiding a hard content pop.
+    delayMs = 100,
     post,
     emptyValue,
     allowEmptyLive = false,

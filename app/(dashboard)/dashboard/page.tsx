@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import type { BusinessListItem } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
 import { useApiGet } from "@/components/hooks/use-api-get";
-import { businessesMock } from "@/components/mocks/businesses";
 import { dashboardStatsMock } from "@/components/mocks/dashboard-stats";
 import {
   mediumDate,
@@ -30,19 +29,23 @@ const TABLE_GRID =
 /** P1 Dashboard — KPI cards + businesses table (prototype-faithful). */
 export default function DashboardPage() {
   const router = useRouter();
-  const { spend, capHit, setBizSelId } = useAppState();
-  // Live once flipped on in LIVE_ENDPOINTS (components/lib/api.ts); typed
-  // mock fallback until then — the Day-5 swap is the registry flip.
-  const { status, data, error, retry } = useApiGet(
-    "/api/businesses",
-    businessesMock,
-  );
+  const {
+    spend,
+    capHit,
+    setBizSelId,
+    // UAT-3: consume the provider's businesses read — the page fetching
+    // /api/businesses itself doubled the request on every dashboard mount.
+    businesses: providerBusinesses,
+    businessesStatus: status,
+    businessesError: error,
+    retryBusinesses: retry,
+  } = useAppState();
   const stats =
     useApiGet("/api/dashboard/stats", dashboardStatsMock).data ??
     dashboardStatsMock;
   const [filter, setFilter] = useState<Filter>("all");
 
-  const businesses = data ?? [];
+  const businesses = status === "ready" ? providerBusinesses : [];
   const clients = businesses.filter((b) => b.is_client);
   const prospects = businesses.filter((b) => !b.is_client);
   const rows =
