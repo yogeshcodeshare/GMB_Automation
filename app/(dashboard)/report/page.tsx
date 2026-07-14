@@ -49,7 +49,6 @@ export default function ReportPage() {
     bizSel,
     setBizSelId,
     bizSelIsFixture,
-    businessesSource,
     capHit,
     catApplied,
     liveDataEnabled,
@@ -154,15 +153,14 @@ export default function ReportPage() {
     `${report.business.name}_GMB_Audit_${report.scores.total}_${lang}.pdf`;
 
   // UAT-5: saved contacts for THIS business only — the owner captured via
-  // Mark-as-Client / the client record. No fabricated numbers; contacts
-  // supplied by demo data are badged DEMO. (Once UAT-2's is_demo lands on
-  // Business, the badge keys off it instead of the transport source.)
+  // Mark-as-Client / the client record. No fabricated numbers; contacts on a
+  // demo business are badged DEMO (per-row is_demo flag, main 4715650).
   const waContacts: WaContact[] = bizSel.owner_whatsapp
     ? [
         {
           phone: bizSel.owner_whatsapp,
           label: bizSel.owner_name ?? "owner",
-          demo: businessesSource === "mock",
+          demo: bizSel.is_demo === true,
         },
       ]
     : [];
