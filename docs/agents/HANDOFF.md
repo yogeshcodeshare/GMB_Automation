@@ -20,6 +20,19 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-18 19:50 IST — frontend
+**Day-7 UAT fixes + demo-mode UI + full sweep — 4 commits (`746d15b`/`b38bf0f`/`25bc789`/`8532da8`).**
+UAT-1 PDF error toast + auto-open + expiry re-request; WA real contacts only (DEMO-badged); UAT-3
+double-fetch FIXED + "slow screens" = dev-only first-hit compiles (**@Yogesh: UAT on `npm run build
+&& npm start`, not `next dev`**); UAT-2 demo-mode UI (Run demo audit CTA + ₹0 preview + DEMO badges +
+P3 DEMO DATA banner off `source/is_demo` + dashboard-row DEMO chip; sends `mode:"demo"/"live"`);
+**sweep = Workflow'd 61-agent audit → 36 adversarially-confirmed defects, ALL fixed** (P2 Enter-key
+bypassed paid-search gate [HIGH], P4/P8 search unwired, P11 guard ignored live response + toasted
+success on failure [HIGH], P9 stale pairing, OSM same-tab escape, ~20 fixture literals → mocks).
+Contract asks: (a) `is_demo` on Business — **[MAIN: DONE `4715650`]**; (b) `AiGenerateRequest.fb_post`
+optional `audience?` — [MAIN: landing]. Gates: typecheck 0 · lint clean · build ✓.
+**[MAIN 20:30: merged into `main` — full re-gate below.]**
+
 ### @main — 2026-07-18 15:10 IST — backend
 **3 UAT PRs + seed backfill EXECUTED live.** ① UAT-1 (`2ff782c`) EP-006 failure hardening —
 typed human-readable envelopes (FEATURE_DISABLED/PdfEngineError/storage-classified, no silent

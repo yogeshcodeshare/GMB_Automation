@@ -1,7 +1,9 @@
+import { pendingReviewsCountMock } from "@/components/mocks/reviews";
+
 export interface NavItem {
   label: string;
   href: string;
-  /** Marigold count badge (Review Inbox 28). */
+  /** Marigold count badge (Review Inbox pending count). */
   countBadge?: number;
   /** Small outline badge (PAID / PUBLIC). */
   outlineBadge?: string;
@@ -27,7 +29,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Audit Report", href: "/report" },
       { label: "Competitors", href: "/competitors" },
       { label: "Grid Scan", href: "/grid" },
-      { label: "Review Inbox", href: "/reviews", countBadge: 28 },
+      // Sweep fix: badge derives from the reviews mock, not a literal.
+      { label: "Review Inbox", href: "/reviews", countBadge: pendingReviewsCountMock },
       { label: "Post Audit", href: "/posts" },
       { label: "Website Audit", href: "/website" },
     ],

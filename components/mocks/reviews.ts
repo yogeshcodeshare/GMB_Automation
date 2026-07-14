@@ -89,6 +89,12 @@ export const reviewsMock: ReviewItem[] = [
 /** P6 KPI row + quality strip — same object EP-002 embeds. */
 export const reviewStatsMock: ReviewStats = auditReportMock.review_stats!;
 
+/** Unreplied count derived from the stats (30 total · 6.67% replied → 28).
+ *  Single source for the nav badge, filter chip and AI-tools caption. */
+export const pendingReviewsCountMock =
+  reviewStatsMock.total -
+  Math.round((reviewStatsMock.total * reviewStatsMock.reply_rate_pct) / 100);
+
 /** Bilingual keyword cloud (MS1-T11 tokenizer output). */
 export const keywordCloudMock: KeywordCloudItem[] = [
   { token: "experience", count: 15, kind: "unigram" },
@@ -115,8 +121,8 @@ export const reviewTrendMock: ReviewTrendPoint[] = [
  * (the 6 above are the demo sample; production derives these).
  */
 export const reviewFiltersMock = [
-  { key: "all", label: "All 30" },
-  { key: "pending", label: "Pending 28" },
+  { key: "all", label: `All ${reviewStatsMock.total}` },
+  { key: "pending", label: `Pending ${pendingReviewsCountMock}` },
   { key: "5", label: "5★ 28" },
   { key: "low", label: "≤3★ 1" },
   { key: "replied", label: "Replied 2" },

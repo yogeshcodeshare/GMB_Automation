@@ -95,6 +95,10 @@ export function pointDirection(ri: number, ci: number): string {
   return ns + ew;
 }
 
+/** Weak-area caption fragment shared by the grid + teleport insight cards
+ *  (sweep fix: the phrase was hardcoded in the page in two variants). */
+export const gridWeakNoteMock = "ranks 9–14 beyond 1 km";
+
 /** Businesses seen across the grid (popover top-5 derivation, prototype). */
 export const gridOthersMock = [
   "Avani Hypnotism & Wellness",

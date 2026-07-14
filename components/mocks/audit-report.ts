@@ -21,6 +21,11 @@ const pid = manovedh.place_id ?? "";
 
 export const auditReportMock: AuditReport = {
   business: manovedh,
+  // UAT-2 provenance — the seeded/mock audits ARE demo data (MAIN's seed-wide
+  // backfill marks them is_demo); P3 renders its persistent DEMO DATA banner
+  // off these two fields.
+  source: "demo",
+  is_demo: true,
   audit: {
     id: "audit-manovedh-0807",
     business_id: manovedh.id,

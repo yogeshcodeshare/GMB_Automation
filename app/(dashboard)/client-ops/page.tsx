@@ -6,6 +6,8 @@ import type { ServiceCycle } from "@/types";
 import { useAppState } from "@/components/shell/app-state";
 import {
   opsCountersMock,
+  planBaseLabelMock,
+  reportScheduleMock,
   serviceCyclesJuneMock,
   serviceCyclesMock,
   todaysWorkMock,
@@ -75,7 +77,9 @@ export default function ClientOpsPage() {
 
   const client = clients.find((b) => b.id === clientId) ?? clients[0];
   const cycles = month === "July 2026" ? serviceCyclesMock : serviceCyclesJuneMock;
-  const cycle: ServiceCycle | undefined = cycles[clientId];
+  // Sweep fix: look up by the RESOLVED client (clientId can go stale when
+  // the live list replaces mock ids — client falls back, the cycle didn't).
+  const cycle: ServiceCycle | undefined = client ? cycles[client.id] : undefined;
   const checklist = (cycle?.checklist ?? {}) as Record<string, number>;
 
   if (!client) {
@@ -115,9 +119,11 @@ export default function ClientOpsPage() {
           ))}
         </select>
         <ConnChip status={client.connection_status} size="sm" />
-        <span className="rounded-chip bg-bg-nav px-[10px] py-1 text-[11px] font-semibold text-white">
-          GMB Boost ₹2,999
-        </span>
+        {client.plan && (
+          <span className="rounded-chip bg-bg-nav px-[10px] py-1 text-[11px] font-semibold text-white">
+            {planBaseLabelMock[client.plan.base] ?? client.plan.base}
+          </span>
+        )}
         {client.plan?.addons.map((a) => (
           <span
             key={a}
@@ -127,11 +133,13 @@ export default function ClientOpsPage() {
           </span>
         ))}
         <div className="flex-1" />
-        <span className="whitespace-nowrap rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
-          {cycle?.report_sent
-            ? "Report: Sent ✓"
-            : "Report: Scheduled → 1 Aug 09:00"}
-        </span>
+        {cycle && (
+          <span className="whitespace-nowrap rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
+            {cycle.report_sent
+              ? "Report: Sent ✓"
+              : `Report: Scheduled → ${reportScheduleMock}`}
+          </span>
+        )}
       </Card>
 
       {/* Today's work strip — one-tap pending actions across clients */}

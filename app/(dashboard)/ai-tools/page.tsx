@@ -16,7 +16,10 @@ import {
   festivalGreetingsMock,
   mediaInboxMock,
 } from "@/components/mocks/ai-tools";
-import { reviewsMock } from "@/components/mocks/reviews";
+import {
+  pendingReviewsCountMock,
+  reviewsMock,
+} from "@/components/mocks/reviews";
 import { CategoryFinder } from "@/components/ai-tools/category-finder";
 import { CONN_META } from "@/components/ui/conn";
 import { Card } from "@/components/ui/card";
@@ -153,7 +156,12 @@ export default function AiToolsPage() {
     post: postText,
     reply: replyText,
     desc: descAfter,
-    qa: qaPairs.map((p) => `Q: ${p.q}\nA: ${p.a}`).join("\n\n"),
+    // Sweep fix: "Save n selected" saves exactly the CHECKED pairs — all
+    // five only when nothing is checked (the plain Copy/Save path).
+    qa: qaPairs
+      .filter((_, i) => qaSelCount === 0 || qaSel[i])
+      .map((p) => `Q: ${p.q}\nA: ${p.a}`)
+      .join("\n\n"),
     fb: fbText,
     creative: `${festText.replace("\n", " ")} — ${offer}`,
   };
@@ -180,7 +188,10 @@ export default function AiToolsPage() {
             : tab === "qa"
               ? { tool: "qa", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", question: question || undefined, suggest_five: !question }
               : tab === "fb"
-                ? { tool: "fb_post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", topic, emoji_level: emoji === "None" ? "none" : emoji === "Some" ? "some" : "festive", include_gbp_link: gbpLink === "Yes" }
+                // Sweep fix: the Audience control now travels with the request
+                // (folded into topic — the locked AiGenerateRequest has no
+                // audience field; contract ask filed in HANDOFF).
+                ? { tool: "fb_post", business_id: toolBiz.id, lang, tone: tone === "Professional" ? "professional" : tone === "Festive" ? "festive" : "warm", topic: audience === "Local community" ? `${topic} — written for the local community, not just customers` : topic, emoji_level: emoji === "None" ? "none" : emoji === "Some" ? "some" : "festive", include_gbp_link: gbpLink === "Yes" }
                 : { tool: "festival", business_id: toolBiz.id, lang, festival, template: (tplIdx + 1) as 1 | 2 | 3, offer_line: offer };
     setLoading(true);
     void (async () => {
@@ -263,7 +274,7 @@ export default function AiToolsPage() {
       </div>
 
       {tab === "cat" ? (
-        <CategoryFinder onUsage={bumpUsage} />
+        <CategoryFinder onUsage={bumpUsage} businessName={toolBiz.name} />
       ) : (
         <div className="flex flex-wrap items-stretch gap-[14px]">
           {/* Left — shared form */}
@@ -353,7 +364,9 @@ export default function AiToolsPage() {
             {tab === "reply" && (
               <>
                 <div>
-                  <div className={CAPTION}>Pick a pending review · 28</div>
+                  <div className={CAPTION}>
+                    Pick a pending review · {pendingReviewsCountMock}
+                  </div>
                   <div className="flex flex-col gap-[6px]">
                     {pendingReviews.map((r, i) => (
                       <button
@@ -569,9 +582,14 @@ export default function AiToolsPage() {
                     <div className="whitespace-pre-line text-[13px] leading-[1.65]">
                       {postText}
                     </div>
-                    <button className="mt-[10px] rounded-chip border-[1.5px] border-brand bg-bg-surface px-4 py-[7px] text-[12px] font-semibold text-brand">
+                    {/* Static preview chip — not a real control (sweep fix:
+                        was a focusable <button> with no handler). */}
+                    <span
+                      aria-hidden
+                      className="mt-[10px] inline-block rounded-chip border-[1.5px] border-brand bg-bg-surface px-4 py-[7px] text-[12px] font-semibold text-brand"
+                    >
                       {cta}
-                    </button>
+                    </span>
                   </div>
                 </div>
                 <div className="flex justify-between gap-[10px] text-[11px] text-ink-faint">
@@ -792,7 +810,9 @@ export default function AiToolsPage() {
                       className="absolute inset-x-0 bottom-[9px] text-center text-[9.5px]"
                       style={{ color: tpl.sub }}
                     >
-                      फोन: 98XXX XXXXX · कराड
+                      {/* masked placeholder — the real phone renders from the
+                          profile at export time (EP-016) */}
+                      फोन: 98XXX XXXXX{toolBiz.city ? ` · ${toolBiz.city}` : ""}
                     </div>
                   </div>
                 </div>

@@ -36,6 +36,7 @@ export default function DashboardPage() {
     // UAT-3: consume the provider's businesses read — the page fetching
     // /api/businesses itself doubled the request on every dashboard mount.
     businesses: providerBusinesses,
+    businessesSource,
     businessesStatus: status,
     businessesError: error,
     retryBusinesses: retry,
@@ -256,11 +257,20 @@ export default function DashboardPage() {
                     "items-center border-t border-[rgba(27,35,33,0.07)] py-3 text-[13.5px] hover:bg-[#FAF8F4]",
                   )}
                 >
-                  <div
-                    title={b.name}
-                    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold"
-                  >
-                    {b.name}
+                  <div className="flex min-w-0 items-center gap-[7px]">
+                    <span
+                      title={b.name}
+                      className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-semibold"
+                    >
+                      {b.name}
+                    </span>
+                    {/* UAT-2: demo rows are badged. Keyed off the list source
+                        until GET /api/businesses carries is_demo (HANDOFF ask). */}
+                    {businessesSource === "mock" && (
+                      <span className="flex-none rounded-[4px] bg-[#EEF1F4] px-[5px] py-[1px] text-[9px] font-bold tracking-[0.5px] text-[#8697A6]">
+                        DEMO
+                      </span>
+                    )}
                   </div>
                   <div className="text-[13px] text-ink-soft">{b.city}</div>
                   <div className="flex items-center gap-[5px]">

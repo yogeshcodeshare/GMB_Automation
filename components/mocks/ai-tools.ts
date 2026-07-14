@@ -147,6 +147,10 @@ export const creativeTemplatesMock: CreativeTemplate[] = [
   { outer: "#FBF7EF", inner: "1.5px solid #0F5C48", title: "#14201C", accent: "#0F5C48", sub: "rgba(20,32,28,0.55)", logo: "rgba(20,32,28,0.35)" },
 ];
 
+/** The Category Finder's AI-recommended new primary (demo). Consumed by the
+ *  finder AND the P3 categories chip so they can never drift apart. */
+export const recommendedPrimaryCategoryMock = "Mental health clinic";
+
 /** EP-015 category intel (base view) + drill-in sets + services per category. */
 export const categoryIntelMock: CategoryIntel = {
   current: [

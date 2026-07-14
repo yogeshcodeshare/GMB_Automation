@@ -24,6 +24,38 @@ export function DemoDataBadge({ className }: { className?: string }) {
   );
 }
 
+/**
+ * UAT-2 — the demo-mode variant of the off note: live data being off no
+ * longer BLOCKS the audit flow, it explains that THIS run is a ₹0 demo.
+ */
+export function DemoRunNote({
+  className,
+  align = "left",
+}: {
+  className?: string;
+  align?: "left" | "right";
+}) {
+  return (
+    <div
+      className={cn(
+        "text-[11.5px] font-medium text-[#4A5A6A]",
+        align === "right" && "text-right",
+        className,
+      )}
+    >
+      Live data off — this run uses <b>demo data</b> (₹0, no DataForSEO
+      calls).{" "}
+      <Link
+        href="/settings"
+        className="font-semibold text-[#33566E] underline underline-offset-2 hover:text-[#1F3A4D]"
+      >
+        Enable live data
+      </Link>{" "}
+      for real Google data.
+    </div>
+  );
+}
+
 /** Inline "Live data off — enable in Settings" note (slate, not red). */
 export function LiveDataOffNote({
   className,

@@ -111,3 +111,8 @@ export const websiteAuditMock: WebsiteAuditDetail = {
  * add `psi_desktop: number | null`. Display-only mock until arbitrated.
  */
 export const psiDesktopMock = 71;
+
+/** Hours-match card footer note (display copy tied to the fixture's two
+ *  overnight-block anomalies — flushable). */
+export const websiteHoursNoteMock =
+  'Website mirrors the profile — including the two odd "12–9 AM" blocks (see Hours card).';

@@ -8,6 +8,7 @@ import {
   categoryIntelMock,
   categoryServicesMock,
   formatVolume,
+  recommendedPrimaryCategoryMock,
 } from "@/components/mocks/ai-tools";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
@@ -23,9 +24,12 @@ const CAPTION =
  */
 export function CategoryFinder({
   onUsage,
+  businessName,
 }: {
   /** Bumps the shared usage meter (AI suggesters count as requests). */
   onUsage: () => void;
+  /** Whose categories these are — from the page's business selector. */
+  businessName: string;
 }) {
   const toast = useToast();
   const { catApplied, setCatApplied } = useAppState();
@@ -35,11 +39,17 @@ export function CategoryFinder({
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
 
-  const related =
+  const relatedAll =
     drill && categoryDrillMock[drill]
       ? categoryDrillMock[drill]
       : categoryIntelMock.related;
-  const recCat = drill ?? "Mental health clinic";
+  // Sweep fix: the search box now actually filters the grid (it was unwired).
+  const related = search.trim()
+    ? relatedAll.filter((r) =>
+        r.category.toLowerCase().includes(search.trim().toLowerCase()),
+      )
+    : relatedAll;
+  const recCat = drill ?? recommendedPrimaryCategoryMock;
   const services =
     categoryServicesMock[recCat] ?? categoryIntelMock.related_services;
 
@@ -49,7 +59,7 @@ export function CategoryFinder({
       <Card className="flex min-w-[280px] flex-1 flex-col gap-[14px] px-5 py-4">
         <div>
           <div className="mb-[2px] text-[13px] font-bold">
-            Current categories — मनोवेध
+            Current categories — {businessName}
           </div>
           <div className="mb-[10px] text-[11.5px] text-ink-faint">
             From the profile · ✗ = flagged generic
@@ -120,8 +130,10 @@ export function CategoryFinder({
                 type="button"
                 onClick={() => {
                   onUsage();
-                  setDrill("Mental health clinic");
-                  toast("AI suggests: Mental health clinic (see related →)");
+                  setDrill(recommendedPrimaryCategoryMock);
+                  toast(
+                    `AI suggests: ${recommendedPrimaryCategoryMock} (see related →)`,
+                  );
                 }}
                 className="mt-2 rounded-[7px] bg-brand px-[15px] py-[7px] text-[12px] font-semibold text-white hover:bg-brand-hover"
               >
@@ -163,6 +175,12 @@ export function CategoryFinder({
           )}
         </div>
         <div className="mb-[18px] flex flex-wrap gap-[7px]">
+          {related.length === 0 && (
+            <span className="text-[12px] text-ink-faint">
+              No categories match &quot;{search.trim()}&quot; — clear the
+              search to see all.
+            </span>
+          )}
           {related.map((r) => {
             const vol = formatVolume(r.monthly_volume);
             return (
