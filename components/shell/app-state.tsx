@@ -14,6 +14,7 @@ import {
   setLiveDataDisabledHandler,
 } from "@/components/lib/api";
 import { useApiGet } from "@/components/hooks/use-api-get";
+import type { MockQueryStatus } from "@/components/hooks/use-mock-query";
 import { businessesMock, isFixtureBusiness } from "@/components/mocks/businesses";
 import {
   spendTodayCapHitMock,
@@ -26,6 +27,14 @@ export type PdfLang = PdfLanguage;
 interface AppState {
   /** All businesses — live `/api/businesses` when flipped, mock fallback. */
   businesses: BusinessListItem[];
+  /** Where the businesses list came from — "mock" rows are demo data (UAT-5
+   *  badges contacts sourced from them as DEMO). */
+  businessesSource: "live" | "mock";
+  /** Query state of the provider's businesses read — consume THIS on pages
+   *  instead of re-fetching /api/businesses (UAT-3: no double-fetch). */
+  businessesStatus: MockQueryStatus;
+  businessesError: string | null;
+  retryBusinesses: () => void;
   /** Globally selected business (drives workspace screens). */
   bizSel: BusinessListItem;
   setBizSelId: (id: string) => void;
@@ -116,6 +125,10 @@ export function AppStateProvider({
       businesses.find((b) => b.id === bizSelId) ?? businesses[0];
     return {
       businesses,
+      businessesSource: businessesQ.source,
+      businessesStatus: businessesQ.status,
+      businessesError: businessesQ.error,
+      retryBusinesses: businessesQ.retry,
       bizSel,
       setBizSelId,
       bizSelIsFixture: isFixtureBusiness(bizSel.id),
@@ -134,6 +147,10 @@ export function AppStateProvider({
     };
   }, [
     businesses,
+    businessesQ.source,
+    businessesQ.status,
+    businessesQ.error,
+    businessesQ.retry,
     bizSelId,
     capPreview,
     catApplied,

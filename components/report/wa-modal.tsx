@@ -8,26 +8,38 @@ import {
   PdfLangPicker,
 } from "./pdf-lang-picker";
 
+/** A real saved contact for THIS business (owner from Mark-as-Client /
+ *  client record). `demo` marks demo-data-supplied contacts (UAT-5). */
+export interface WaContact {
+  phone: string;
+  label: string;
+  demo?: boolean;
+}
+
 /**
- * WhatsApp send modal — +91 phone input, recent chips, PDF attachment
- * preview with a CR-3 language chooser, Cancel/Send (EP-007 on Day 5;
- * feature-flagged until keys arrive).
+ * WhatsApp send modal — +91 phone input, saved-contact chips (never
+ * fabricated numbers — UAT-5), PDF attachment preview with a CR-3 language
+ * chooser, Cancel/Send (EP-007; feature-flagged until keys arrive).
  */
 export function WaModal({
   pdfNameFor,
   initialLang,
-  recent,
+  contacts,
+  initialPhone,
   onClose,
   onSend,
 }: {
   /** Filename for the chosen language (mirrors EP-006 naming). */
   pdfNameFor: (lang: PdfLang) => string;
   initialLang: PdfLang;
-  recent: string[];
+  /** Saved contacts for THIS business only; empty → no chips row. */
+  contacts: WaContact[];
+  /** Prefill — the business owner's WhatsApp when saved, else empty. */
+  initialPhone?: string;
   onClose: () => void;
   onSend: (phone: string, lang: PdfLang) => void;
 }) {
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone ?? "");
   const [lang, setLang] = useState<PdfLang>(initialLang);
   const valid = phone.replace(/\D/g, "").length >= 10;
 
@@ -64,21 +76,30 @@ export function WaModal({
             className="min-w-0 flex-1 rounded-[9px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface p-3 font-mono text-[15px] outline-brand"
           />
         </div>
-        <div className="mb-[6px] text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft">
-          Recent
-        </div>
-        <div className="mb-3 flex flex-wrap gap-[6px]">
-          {recent.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setPhone(r.split("·")[0].trim())}
-              className="rounded-chip border-[1.5px] border-[rgba(27,35,33,0.14)] bg-bg-surface px-[11px] py-[5px] font-mono text-[12px] font-semibold hover:border-brand"
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        {contacts.length > 0 && (
+          <>
+            <div className="mb-[6px] text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft">
+              Saved contacts
+            </div>
+            <div className="mb-3 flex flex-wrap gap-[6px]">
+              {contacts.map((c) => (
+                <button
+                  key={c.phone}
+                  type="button"
+                  onClick={() => setPhone(c.phone)}
+                  className="flex items-center gap-[6px] rounded-chip border-[1.5px] border-[rgba(27,35,33,0.14)] bg-bg-surface px-[11px] py-[5px] font-mono text-[12px] font-semibold hover:border-brand"
+                >
+                  {c.phone} · {c.label}
+                  {c.demo && (
+                    <span className="rounded-[4px] bg-[#EEF1F4] px-[5px] py-[1px] font-sans text-[9px] font-bold tracking-[0.5px] text-[#8697A6]">
+                      DEMO
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <PdfLangPicker
           value={lang}
           onChange={setLang}

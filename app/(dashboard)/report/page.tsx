@@ -7,13 +7,12 @@ import { cn } from "@/lib/utils";
 import { useAppState } from "@/components/shell/app-state";
 import { auditReportMock } from "@/components/mocks/audit-report";
 import { SEEDED_AUDIT_ID } from "@/components/mocks/businesses";
-import { waRecentContactsMock } from "@/components/mocks/wa-contacts";
 import { useApiGet } from "@/components/hooks/use-api-get";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FixesCard } from "@/components/report/fixes-card";
 import { RubricCard } from "@/components/report/rubric-card";
 import { BandLabel, ScoreGauge } from "@/components/report/score-gauge";
-import { WaModal } from "@/components/report/wa-modal";
+import { WaModal, type WaContact } from "@/components/report/wa-modal";
 import {
   PDF_LANG_LABEL,
   PdfLangPicker,
@@ -54,6 +53,7 @@ export default function ReportPage() {
     bizSel,
     setBizSelId,
     bizSelIsFixture,
+    businessesSource,
     capHit,
     catApplied,
     liveDataEnabled,
@@ -152,10 +152,28 @@ export default function ReportPage() {
   // CR-3: Generate PDF opens the language chooser first (per-business memory).
   const pdfLang = pdfLangFor(bizSel.id);
 
-  // B3: real EP-006 — POST /api/report/:auditId { language }. Registry key
-  // "/api/report" stays OFF until MAIN flips (FEATURE_PDF); the mock path
-  // keeps the staged demo feel. Returns the PdfDone it settled on.
-  const genPdf = async (lang: PdfLang): Promise<PdfDone> => {
+  // UAT-5: saved contacts for THIS business only — the owner captured via
+  // Mark-as-Client / the client record. No fabricated numbers; contacts
+  // supplied by demo data are badged DEMO. (Once UAT-2's is_demo lands on
+  // Business, the badge keys off it instead of the transport source.)
+  const waContacts: WaContact[] = bizSel.owner_whatsapp
+    ? [
+        {
+          phone: bizSel.owner_whatsapp,
+          label: bizSel.owner_name ?? "owner",
+          demo: businessesSource === "mock",
+        },
+      ]
+    : [];
+
+  // B3: real EP-006 — POST /api/report/:auditId { language } (LIVE).
+  // UAT-1: errors surface as a visible toast (never a silent spin); success
+  // auto-opens the signed URL AND leaves a persistent "Open PDF ↗" chip.
+  // Returns the PdfDone it settled on, or null on a live failure.
+  const genPdf = async (
+    lang: PdfLang,
+    { autoOpen = true }: { autoOpen?: boolean } = {},
+  ): Promise<PdfDone | null> => {
     setPdfChooserOpen(false);
     setPdfLang(bizSel.id, lang);
     setPdfBusy(true);
@@ -163,21 +181,53 @@ export default function ReportPage() {
       `/api/report/${report.audit.id}`,
       { language: lang },
     );
-    const done: PdfDone = r.ok
-      ? { lang, url: r.data.storage_url, pdfPath: r.data.pdf_path }
-      : { lang, url: null, pdfPath: null };
-    const finish = () => {
+    if (r.ok) {
+      const done: PdfDone = {
+        lang,
+        url: r.data.storage_url,
+        pdfPath: r.data.pdf_path,
+      };
       setPdfBusy(false);
       setPdfDone(done);
-      toast(
-        done.url
-          ? `PDF ready — open or download · ${PDF_LANG_LABEL[lang]}`
-          : `PDF ready — ${pdfNameFor(lang)} · ${PDF_LANG_LABEL[lang]}`,
-      );
-    };
-    if (r.ok) finish();
-    else await new Promise<void>((res) => setTimeout(() => (finish(), res()), 1300));
+      toast(`PDF ready — opening · ${PDF_LANG_LABEL[lang]}`);
+      if (autoOpen && done.url) window.open(done.url, "_blank", "noopener");
+      return done;
+    }
+    if (r.code !== "ENDPOINT_OFF") {
+      // Live EP-006 failure — show the actual message, stop the spinner,
+      // and do NOT fake a done chip.
+      setPdfBusy(false);
+      toast(`PDF failed — ${r.message}`);
+      return null;
+    }
+    // Registry OFF → staged demo-mode success (mock path, no URL).
+    const done: PdfDone = { lang, url: null, pdfPath: null };
+    await new Promise<void>((res) =>
+      setTimeout(() => {
+        setPdfBusy(false);
+        setPdfDone(done);
+        toast(`PDF ready — ${pdfNameFor(lang)} · ${PDF_LANG_LABEL[lang]}`);
+        res();
+      }, 700),
+    );
     return done;
+  };
+
+  // UAT-1c: signed URLs expire — probe before opening; on a 4xx answer,
+  // re-request EP-006 for the same language and open the fresh URL.
+  const openPdf = async (done: PdfDone) => {
+    if (!done.url) return;
+    try {
+      const probe = await fetch(done.url, { method: "HEAD" });
+      if (!probe.ok) {
+        toast("PDF link expired — refreshing…");
+        await genPdf(done.lang);
+        return;
+      }
+    } catch {
+      // CORS/network probe failure — fall through and just try opening.
+    }
+    window.open(done.url, "_blank", "noopener");
   };
 
   /** 2-line summary that travels with the PDF (EP-007 body). */
@@ -195,7 +245,9 @@ export default function ReportPage() {
     // Ensure a PDF exists for this language first (live path only).
     let pdfPath = pdfDone?.lang === lang ? pdfDone.pdfPath : null;
     if (isLive("/api/wa/send") && !pdfPath) {
-      pdfPath = (await genPdf(lang)).pdfPath;
+      pdfPath = (await genPdf(lang, { autoOpen: false }))?.pdfPath ?? null;
+      // Live PDF generation failed — genPdf already toasted the error.
+      if (!pdfPath) return;
     }
     const r = await apiPostResult<{ sent: true; wa_message_id: string }>(
       "/api/wa/send",
@@ -249,16 +301,28 @@ export default function ReportPage() {
               </span>
             )}
             <ConnChip status={report.business.connection_status} />
-            <span className="rounded-chip bg-band-good-bg px-[10px] py-1 text-[11.5px] font-semibold text-band-good">
-              Claimed ✓
-            </span>
-            <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
-              {snap.rating?.toFixed(1)}★ · {snap.reviews_total} reviews
-            </span>
-            <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
-              Audited{" "}
-              {snap.audited_at &&
-                new Date(snap.audited_at).toLocaleString("en-IN", {
+            {/* UAT-4: chips never render with empty values — hide when the
+                snapshot is missing the field, "—" for a partial pair. */}
+            {snap.claimed !== undefined &&
+              (snap.claimed ? (
+                <span className="rounded-chip bg-band-good-bg px-[10px] py-1 text-[11.5px] font-semibold text-band-good">
+                  Claimed ✓
+                </span>
+              ) : (
+                <span className="rounded-chip bg-band-crit-bg px-[10px] py-1 text-[11.5px] font-semibold text-band-crit">
+                  Unclaimed
+                </span>
+              ))}
+            {(snap.rating != null || snap.reviews_total != null) && (
+              <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
+                {snap.rating != null ? snap.rating.toFixed(1) : "—"}★ ·{" "}
+                {snap.reviews_total ?? "—"} reviews
+              </span>
+            )}
+            {snap.audited_at && (
+              <span className="rounded-chip bg-bg-app px-[10px] py-1 font-mono text-[11.5px] font-semibold text-ink-soft">
+                Audited{" "}
+                {new Date(snap.audited_at).toLocaleString("en-IN", {
                   day: "2-digit",
                   month: "short",
                   year: "numeric",
@@ -267,7 +331,8 @@ export default function ReportPage() {
                   hour12: false,
                   timeZone: "Asia/Kolkata",
                 })}
-            </span>
+              </span>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -281,14 +346,15 @@ export default function ReportPage() {
           </Button>
           {pdfDone && !pdfBusy && (
             pdfDone.url ? (
-              <a
-                href={pdfDone.url}
-                target="_blank"
-                rel="noreferrer"
+              // UAT-1: persistent chip; click re-checks the signed URL and
+              // re-requests EP-006 if it expired (4xx) before opening.
+              <button
+                type="button"
+                onClick={() => void openPdf(pdfDone)}
                 className="self-center whitespace-nowrap rounded-chip bg-band-good-bg px-[10px] py-1 text-[11.5px] font-bold text-band-good underline-offset-2 hover:underline"
               >
                 ✓ PDF · {PDF_LANG_LABEL[pdfDone.lang]} · Open ↗
-              </a>
+              </button>
             ) : (
               <span className="self-center whitespace-nowrap text-[11.5px] font-semibold text-band-good">
                 ✓ PDF · {PDF_LANG_LABEL[pdfDone.lang]}
@@ -374,12 +440,14 @@ export default function ReportPage() {
           <div className="flex flex-col gap-[9px]">
             {(
               [
-                ["Place ID", report.business.place_id],
-                ["CID", report.business.cid],
-                ["KG ID", snap.kg_id],
+                ["Place ID", report.business.place_id ?? "—"],
+                ["CID", report.business.cid ?? "—"],
+                ["KG ID", snap.kg_id ?? "—"],
                 [
                   "Coordinates",
-                  `${report.business.lat?.toFixed(4)}, ${report.business.lng?.toFixed(4)}`,
+                  report.business.lat != null && report.business.lng != null
+                    ? `${report.business.lat.toFixed(4)}, ${report.business.lng.toFixed(4)}`
+                    : "—",
                 ],
               ] as const
             ).map(([label, value]) => (
@@ -536,9 +604,11 @@ export default function ReportPage() {
             headings — feeds the &quot;Website 6/10&quot; row
           </div>
         </div>
-        <span className="whitespace-nowrap rounded-chip bg-band-warn-bg px-[11px] py-1 font-mono text-[11.5px] font-bold text-band-warn">
-          PageSpeed mobile · {report.website?.psi_score}
-        </span>
+        {report.website?.psi_score != null && (
+          <span className="whitespace-nowrap rounded-chip bg-band-warn-bg px-[11px] py-1 font-mono text-[11.5px] font-bold text-band-warn">
+            PageSpeed mobile · {report.website.psi_score}
+          </span>
+        )}
         <Link
           href="/website"
           className="whitespace-nowrap rounded-lg border-[1.5px] border-brand bg-bg-surface px-[15px] py-2 text-[12.5px] font-semibold text-brand hover:bg-[#F0F5F2]"
@@ -578,7 +648,8 @@ export default function ReportPage() {
         <WaModal
           pdfNameFor={pdfNameFor}
           initialLang={pdfLang}
-          recent={waRecentContactsMock}
+          contacts={waContacts}
+          initialPhone={bizSel.owner_whatsapp ?? undefined}
           onClose={() => setWaOpen(false)}
           onSend={sendWa}
         />

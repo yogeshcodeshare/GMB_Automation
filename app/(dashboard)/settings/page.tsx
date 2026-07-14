@@ -117,12 +117,15 @@ export default function SettingsPage() {
             onClick={() => setLiveDataEnabled(!liveDataEnabled)}
             className={cn(
               "relative h-[26px] w-[46px] flex-none rounded-full transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface",
               liveDataEnabled ? "bg-brand" : "bg-[#C9D2DB]",
             )}
           >
+            {/* UAT-7: left-0 anchors the knob — without it the span's static
+                (centered) position + translate pushed it past the track. */}
             <span
               className={cn(
-                "absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(15,20,18,0.35)] transition-transform",
+                "absolute left-0 top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(15,20,18,0.35)] transition-transform",
                 liveDataEnabled ? "translate-x-[23px]" : "translate-x-[3px]",
               )}
             />
