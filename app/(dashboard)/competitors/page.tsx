@@ -104,7 +104,7 @@ export default function CompetitorsPage() {
   const [inPdf, setInPdf] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [query, setQuery] = useState("mind care");
+  const [query, setQuery] = useState("");
 
   const shortName =
     businessShortNames[report.business.id] ?? report.business.name;
@@ -410,8 +410,18 @@ export default function CompetitorsPage() {
               className="mb-[10px] w-full rounded-[9px] border-[1.5px] border-[rgba(27,35,33,0.18)] bg-bg-surface px-[13px] py-[11px] text-[13.5px] outline-brand"
             />
             <div className="mb-[14px] flex flex-col gap-[7px]">
+              {/* Sweep fix: the search input now filters the list (it was
+                  unwired — typing changed nothing). */}
               {competitorSuggestionsMock
                 .filter((s) => !columns.some((c) => c.name === s.row.name))
+                .filter(
+                  (s) =>
+                    !query.trim() ||
+                    s.row.name
+                      .toLowerCase()
+                      .includes(query.trim().toLowerCase()) ||
+                    s.area.toLowerCase().includes(query.trim().toLowerCase()),
+                )
                 .map((s) => (
                   <button
                     key={s.row.name}

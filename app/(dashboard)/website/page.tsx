@@ -8,6 +8,7 @@ import { auditReportMock } from "@/components/mocks/audit-report";
 import {
   psiDesktopMock,
   websiteAuditMock,
+  websiteHoursNoteMock,
 } from "@/components/mocks/website-audit";
 import { ScoreGauge } from "@/components/report/score-gauge";
 import { Button } from "@/components/ui/button";
@@ -246,8 +247,7 @@ export default function WebsiteAuditPage() {
             </div>
           ))}
           <div className="mt-[10px] text-[11px] text-ink-faint">
-            Website mirrors the profile — including the two odd &quot;12–9
-            AM&quot; blocks (see Hours card).
+            {websiteHoursNoteMock}
           </div>
         </Card>
       </div>

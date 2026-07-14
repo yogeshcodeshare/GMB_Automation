@@ -26,11 +26,15 @@ export default function GridMap({
   points,
   center,
   gridN,
+  targetName,
 }: {
   points: GridPoint[];
   center: { lat: number; lng: number };
   /** Grid dimension (5 for 5×5) — used for popover distance/direction. */
   gridN: number;
+  /** The audited business — highlighted in the top-5 popup (sweep fix:
+   *  was a hardcoded name literal inside the component). */
+  targetName: string;
 }) {
   return (
     <MapContainer
@@ -41,7 +45,7 @@ export default function GridMap({
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
       />
       {points.map((p, idx) => {
         const ri = Math.floor(idx / gridN);
@@ -85,12 +89,12 @@ export default function GridMap({
                     </span>
                     <span
                       className={
-                        name === "मनोवेध हिप्नोक्लिनिक"
+                        name === targetName
                           ? "min-w-0 flex-1 truncate text-[11.5px] font-bold text-brand"
                           : "min-w-0 flex-1 truncate text-[11.5px]"
                       }
                     >
-                      {name === "मनोवेध हिप्नोक्लिनिक" ? "★ " : ""}
+                      {name === targetName ? "★ " : ""}
                       {name}
                     </span>
                   </div>

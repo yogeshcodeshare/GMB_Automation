@@ -14,6 +14,8 @@ import {
   gridJulMatrix,
   gridJulResultMock,
   gridMayMatrix,
+  gridOthersMock,
+  gridWeakNoteMock,
   keywordDemandMock,
   pointDirection,
   pointDistanceKm,
@@ -47,6 +49,14 @@ const GRID_LABELS: Array<{ label: string; size: GridSize }> = [
   { label: "7×7", size: 7 },
 ];
 const RADII = ["0.5 km", "1 km", "1.5 km", "3 km", "5 km"];
+
+/** "02 May" from the scan's created_at (sweep fix: dates were hardcoded). */
+const scanDayLabel = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "Asia/Kolkata",
+  });
 
 const CAPTION =
   "text-[11px] font-semibold uppercase tracking-[0.6px] text-ink-soft mb-[6px]";
@@ -303,9 +313,11 @@ export default function GridPage() {
               </div>
               <div className="rounded-lg bg-band-warn-bg px-[10px] py-2 text-[12px] leading-normal text-ink">
                 <span className="font-bold text-band-warn">
-                  Weak to the south-east
+                  Weak to the{" "}
+                  {gridJulResultMock.weak_direction?.split(" (")[0]}
                 </span>{" "}
-                (Malkapur side) — ranks 9–14 beyond 1 km.
+                ({gridJulResultMock.weak_direction?.split(" (")[1] ?? ""} —{" "}
+                {gridWeakNoteMock}.
               </div>
             </Card>
             <Card className="min-w-[260px] flex-1 px-4 py-[14px]">
@@ -402,6 +414,7 @@ export default function GridPage() {
                     lng: auditReportMock.business.lng ?? 0,
                   }}
                   gridN={result.scan.grid_size}
+                  targetName={auditReportMock.business.name}
                 />
               ) : (
                 <div className="overflow-hidden rounded-[10px] border border-[rgba(27,35,33,0.08)]">
@@ -442,10 +455,8 @@ export default function GridPage() {
                           </span>
                           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px]">
                             {rank === 1
-                              ? "मनोवेध हिप्नोक्लिनिक ★"
-                              : (ri + ci) % 2
-                                ? "Avani Hypnotism & Wellness"
-                                : "Hypnotherapy Siddhivinayak"}
+                              ? `${auditReportMock.business.name} ★`
+                              : gridOthersMock[(ri + ci) % 2]}
                           </span>
                         </div>
                       );
@@ -514,8 +525,9 @@ export default function GridPage() {
                 <span className="font-bold text-band-warn">
                   Weak to the {result.weak_direction?.split(" (")[0]}
                 </span>{" "}
-                (Malkapur side) — ranks 9–14 beyond 1 km. Consider a location
-                page + citations for that area.
+                ({result.weak_direction?.split(" (")[1] ?? ""} —{" "}
+                {gridWeakNoteMock}. Consider a location page + citations for
+                that area.
               </div>
               <Card className="px-[15px] py-[13px]">
                 <div className="mb-[6px] text-[11px] font-bold uppercase tracking-[0.8px] text-brand">
@@ -712,7 +724,8 @@ export default function GridPage() {
               <div className="flex flex-wrap items-center justify-center gap-[14px]">
                 <div className="min-w-[220px] max-w-[300px] flex-1">
                   <div className="mb-[6px] text-center text-[12px] font-bold">
-                    02 May · avg{" "}
+                    {scanDayLabel(gridCompareMock.before.scan.created_at)} ·
+                    avg{" "}
                     <span className="text-band-crit">
                       {gridCompareMock.before.scan.avg_rank?.toFixed(1)}
                     </span>
@@ -724,7 +737,7 @@ export default function GridPage() {
                 </div>
                 <div className="min-w-[220px] max-w-[300px] flex-1">
                   <div className="mb-[6px] text-center text-[12px] font-bold">
-                    11 Jul · avg{" "}
+                    {scanDayLabel(gridCompareMock.after.scan.created_at)} · avg{" "}
                     <span className="text-band-good">
                       {gridCompareMock.after.scan.avg_rank?.toFixed(1)}
                     </span>

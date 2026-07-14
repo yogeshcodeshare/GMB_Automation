@@ -16,6 +16,7 @@ import {
 import { useApiGet } from "@/components/hooks/use-api-get";
 import type { MockQueryStatus } from "@/components/hooks/use-mock-query";
 import { businessesMock, isFixtureBusiness } from "@/components/mocks/businesses";
+import { founderMock } from "@/components/mocks/user";
 import {
   spendTodayCapHitMock,
   spendTodayMock,
@@ -142,8 +143,8 @@ export function AppStateProvider({
       setCatApplied,
       pdfLangFor: (bizId: string) => pdfLangByBiz[bizId] ?? "mr",
       setPdfLang,
-      userName: "Founder",
-      userEmail: "founder@agency.in",
+      userName: founderMock.name,
+      userEmail: founderMock.email,
     };
   }, [
     businesses,

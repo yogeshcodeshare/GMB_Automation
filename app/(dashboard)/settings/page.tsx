@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/components/shell/app-state";
 import { useApiGet } from "@/components/hooks/use-api-get";
@@ -51,6 +51,16 @@ export default function SettingsPage() {
   const [guardError, setGuardError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Sweep fix: /api/settings is LIVE and arrives AFTER mount — the inputs
+  // seeded from the mock and ignored the real values. Sync once on arrival.
+  useEffect(() => {
+    if (settingsQ.data && settingsQ.source === "live") {
+      setCapUsd(String(settingsQ.data.daily_spend_cap_usd));
+      setPublicLimit(String(settingsQ.data.public_daily_limit));
+      setPerIp(String(settingsQ.data.per_ip_limit));
+    }
+  }, [settingsQ.data, settingsQ.source]);
+
   const saveGuards = async () => {
     setGuardError(null);
     // Client-side mirror of validateSettingsPatch (0..9999.99, integer limits).
@@ -79,6 +89,12 @@ export default function SettingsPage() {
     if (!r.ok && r.code === "VALIDATION_ERROR") {
       // Surface the server's validation message inline (widened PATCH).
       setGuardError(r.message);
+      return;
+    }
+    if (!r.ok && r.code !== "ENDPOINT_OFF") {
+      // Sweep fix: live failures (network/500/auth) used to fall through to
+      // the success toast — never claim saved when the PATCH failed.
+      setGuardError(`Couldn't save — ${r.message}`);
       return;
     }
     // Live success — or demo-mode local save while the registry is OFF.

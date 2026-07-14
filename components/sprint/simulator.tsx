@@ -1,7 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { sprintRubricDeltasMock } from "@/components/mocks/sprint";
+import {
+  sprintReportMock,
+  sprintRubricDeltasMock,
+} from "@/components/mocks/sprint";
 import { gridJulMatrix, gridMayMatrix } from "@/components/mocks/grid";
 import { MiniGrid } from "@/components/grid/mini-grid";
 import { Card } from "@/components/ui/card";
@@ -109,7 +112,7 @@ export function SprintSimulator({
         <div className="relative w-16 flex-none">
           <MiniGrid matrix={gridMayMatrix} />
           <span className="absolute inset-0 flex items-center justify-center font-mono text-[15px] font-bold text-band-crit">
-            7.8
+            {sprintReportMock.grid.avg_before}
           </span>
         </div>
         <span className="flex-none text-[14px] font-bold text-band-good">
@@ -118,13 +121,21 @@ export function SprintSimulator({
         <div className="relative w-16 flex-none">
           <MiniGrid matrix={gridJulMatrix} />
           <span className="absolute inset-0 flex items-center justify-center font-mono text-[15px] font-bold text-band-good">
-            4.6
+            {sprintReportMock.grid.avg_after}
           </span>
         </div>
         <div className="min-w-0 text-[11.5px] leading-relaxed text-ink-soft">
-          Grid avg <span className="font-bold text-ink">7.8 → 4.6</span>
+          Grid avg{" "}
+          <span className="font-bold text-ink">
+            {sprintReportMock.grid.avg_before} →{" "}
+            {sprintReportMock.grid.avg_after}
+          </span>
           <br />
-          Top-3 coverage <span className="font-bold text-ink">24% → 56%</span>
+          Top-3 coverage{" "}
+          <span className="font-bold text-ink">
+            {sprintReportMock.grid.top3_before}% →{" "}
+            {sprintReportMock.grid.top3_after}%
+          </span>
         </div>
       </div>
     </Card>

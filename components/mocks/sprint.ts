@@ -339,6 +339,10 @@ export const sprintRubricDeltasMock = [
   { label: "NAP consistency !→✓", before: 3, after: 5, state: "up" as const },
 ];
 
+/** Reviews landed since the request machine went live (demo) — shown in the
+ *  'doing' task detail and mirrored in the report's work log. */
+export const sprintMachineReviewsMock = 9;
+
 /** EP-022 report body content (grid/review deltas + narrative blocks). */
 export const sprintReportMock = {
   period: "Sprint 12–20 Jul 2026",

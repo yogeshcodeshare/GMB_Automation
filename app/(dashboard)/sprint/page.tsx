@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { SprintGroup, SprintPatchRequest, SprintTask } from "@/types";
 import { SPRINT_GROUP_LABELS, SPRINT_GROUPS, projectedScore } from "@/types";
@@ -11,6 +12,8 @@ import {
   sprintClientUpdatesMock,
   sprintDetailMock,
   sprintGatesMock,
+  sprintMachineReviewsMock,
+  sprintReportMock,
   sprintTaskUiMock,
 } from "@/components/mocks/sprint";
 import { SprintGate } from "@/components/sprint/gate";
@@ -47,6 +50,7 @@ const STATUS_CHIP: Record<SprintTask["status"], [string, string]> = {
 
 /** P12 Optimization Sprint — client selector → US-024 gate → sprint board. */
 export default function SprintPage() {
+  const router = useRouter();
   const toast = useToast();
   const { businesses, pdfLangFor } = useAppState();
 
@@ -227,8 +231,10 @@ export default function SprintPage() {
         <div className="pb-[13px] pl-8">
           <div className="mb-2 text-[12.5px] leading-relaxed text-ink-soft">
             Review-request machine running —{" "}
-            <span className="font-mono font-semibold text-ink">9</span> new
-            reviews so far · customer photos arrive with reviews.
+            <span className="font-mono font-semibold text-ink">
+              {sprintMachineReviewsMock}
+            </span>{" "}
+            new reviews so far · customer photos arrive with reviews.
           </div>
           <button
             type="button"
@@ -607,7 +613,19 @@ export default function SprintPage() {
                           )}
                           {isWebsite && (
                             <span className="whitespace-nowrap text-[10.5px] font-semibold text-band-warn">
-                              1 internal · 4 with vendor
+                              {
+                                g.tasks.filter(
+                                  (t) =>
+                                    t.status !== "blocked" &&
+                                    t.status !== "done",
+                                ).length
+                              }{" "}
+                              internal ·{" "}
+                              {
+                                g.tasks.filter((t) => t.status === "blocked")
+                                  .length
+                              }{" "}
+                              with vendor
                             </span>
                           )}
                           <span className="flex-1" />
@@ -866,30 +884,33 @@ export default function SprintPage() {
 
           {stage === "complete" && (
             <Card className="flex flex-col items-center gap-3 px-6 py-8 text-center">
-              <span className="rounded-chip bg-band-good-bg px-3 py-1 text-[10.5px] font-bold tracking-[1px] text-band-good">
-                SPRINT COMPLETED · 12–20 JUL 2026
+              <span className="rounded-chip bg-band-good-bg px-3 py-1 text-[10.5px] font-bold uppercase tracking-[1px] text-band-good">
+                {sprintReportMock.period} · completed
               </span>
               <div className="flex flex-wrap items-center justify-center gap-[14px]">
                 <span className="font-mono text-[44px] font-bold text-ink-soft">
-                  41
+                  {sprintReportMock.before_score}
                 </span>
                 <span className="text-[26px] font-bold text-band-good">→</span>
                 <span className="font-mono text-[56px] font-bold text-band-good">
-                  78
+                  {sprintReportMock.after_score}
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <span className="rounded-chip bg-band-warn-bg px-3 py-1 text-[12px] font-bold text-band-warn">
-                  सुधारणा आवश्यक
+                  {sprintReportMock.before_band}
                 </span>
                 <span className="text-[13px] font-bold text-band-good">→</span>
                 <span className="rounded-chip bg-band-good-bg px-3 py-1 text-[12px] font-bold text-band-good">
-                  चांगले
+                  {sprintReportMock.after_band}
                 </span>
               </div>
               <div className="text-[12.5px] text-ink-soft">
-                {doneN}/{tasks.length} tasks · grid avg 7.8 → 4.6 · reply rate
-                6.67% → 100%
+                {doneN}/{tasks.length} tasks · grid avg{" "}
+                {sprintReportMock.grid.avg_before} →{" "}
+                {sprintReportMock.grid.avg_after} · reply rate{" "}
+                {sprintReportMock.reviews.reply_before}% →{" "}
+                {sprintReportMock.reviews.reply_after}%
               </div>
               <div className="mt-1 flex flex-wrap justify-center gap-2">
                 <button
@@ -901,7 +922,7 @@ export default function SprintPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => toast("Monthly service lives in Client Ops")}
+                  onClick={() => router.push("/client-ops")}
                   className="rounded-[9px] bg-brand px-[18px] py-[10px] text-[13px] font-semibold text-white hover:bg-brand-hover"
                 >
                   Monthly service continues in Client Ops →

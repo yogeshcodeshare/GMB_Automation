@@ -6,6 +6,14 @@ import type { ServiceCycle, Settings, SpendLedgerEntry, TodaysWorkItem } from "@
  * client data policy.
  */
 
+/** Base-plan display labels (pricing is demo copy — flushable). */
+export const planBaseLabelMock: Record<string, string> = {
+  gmb_boost: "GMB Boost ₹2,999",
+};
+
+/** Next scheduled monthly report send (demo). */
+export const reportScheduleMock = "1 Aug 09:00";
+
 /** July-2026 service cycles for the 3 clients (quota bars). */
 export const serviceCyclesMock: Record<string, ServiceCycle> = {
   "biz-sahyadri": {

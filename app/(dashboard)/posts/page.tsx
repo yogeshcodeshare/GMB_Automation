@@ -272,7 +272,8 @@ export default function PostAuditPage() {
         <div className="mb-[14px] text-[14.5px] font-bold">
           Posts per quarter{" "}
           <span className="text-[11px] font-medium text-ink-faint">
-            · Dec &apos;20 → Sep &apos;25 · line = cumulative
+            · {timeline[0]?.quarter} →{" "}
+            {timeline[timeline.length - 1]?.quarter} · line = cumulative
           </span>
         </div>
         <div className="relative h-[130px]">
