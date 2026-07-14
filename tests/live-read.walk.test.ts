@@ -25,7 +25,7 @@ describe.skipIf(!hasEnv)("Day-6 live-read walk (live DB)", () => {
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThanOrEqual(6);
     expect(rows[0]).toHaveProperty("name");
-  });
+  }, 30_000);
 
   it("/api/dashboard/stats → computeDashboardStats returns a populated object", async () => {
     const stats = await computeDashboardStats(svc());
@@ -35,7 +35,7 @@ describe.skipIf(!hasEnv)("Day-6 live-read walk (live DB)", () => {
       (v) => typeof v === "number",
     );
     expect(nums.length).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("/api/settings → readSettings returns the seeded row, CR-1 flag fail-safe OFF", async () => {
     const s = await readSettings(svc());
@@ -43,13 +43,13 @@ describe.skipIf(!hasEnv)("Day-6 live-read walk (live DB)", () => {
     expect(Array.isArray(s.model_chain)).toBe(true);
     // Column not applied yet (migration 20260716000001) → reader must fail-safe.
     expect(s.dataforseo_live_enabled).toBe(false);
-  });
+  }, 30_000);
 
   it("/api/spend/today → spend guard getStatus resolves with a numeric cap", async () => {
     const status = await makeSpendGuard().getStatus();
     expect(typeof status.cap_usd).toBe("number");
     expect(typeof status.spent_usd).toBe("number");
-  });
+  }, 30_000);
 });
 
 describe.skipIf(hasEnv)("Day-6 live-read walk — skipped (no service env)", () => {

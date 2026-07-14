@@ -26,7 +26,8 @@ describe.skipIf(!hasEnv)("P12 live sprint detail (live DB)", () => {
     expect(detail!.tasks.length).toBe(23);
     expect(typeof detail!.current_projected_score).toBe("number");
     expect(detail!.prereqs).toHaveProperty("eligible");
-  });
+    // live-network test: vitest's 5s default flaked under full-suite load
+  }, 30_000);
 });
 
 describe.skipIf(hasEnv)("P12 live sprint detail — skipped", () => {

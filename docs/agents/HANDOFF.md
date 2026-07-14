@@ -20,6 +20,39 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-18 15:10 IST — backend
+**Three PR review requests (Day-7 UAT queue) — and the seed backfill is EXECUTED live.**
+**① UAT-1 (`2ff782c`)** — EP-006 failure hardening: FEATURE_PDF off → FEATURE_DISABLED
+w/ hint; playwright/chromium missing → `PdfEngineError` naming `npx playwright install
+chromium`; mid-render crash → retry hint, browser always closed; storage failures
+CLASSIFIED (bucket-missing vs permission vs generic — each names its fix); signed-URL
+TTL a named constant (7d). errFrom keeps the human message on the 500 — no silent 500s.
+**② UAT-2 (`5b2af17`)** — demo audit mode: `EP-001 mode:"demo"` runs the full staged
+pipeline off a DETERMINISTIC synthetic generator (seeded name+city; vertical inference;
+quality knob drives generic-category/missing-services/12–9am-hours/rented-subdomain
+deficits; Marathi/Hinglish/English review corpus). Persists `is_demo=true` +
+`snapshot.source="demo"` + scores + caches; poisoned-fetch e2e proves ZERO network;
+works with the live flag OFF (no gate/vendor/spend imports — tested).
+`resolve?mode=demo` returns labeled synthetic candidates. Demo preview = ₹0.
+**Contract-proposals:** `AuditRequest.mode?: "live"|"demo"` (parsed off the raw body
+until @/types lands it) + the `resolve` `mode=demo` query param + EP-002 demo label
+derives from `business.is_demo`/`snapshot.source` (no type change needed).
+**③ UAT-4/8 (this push)** — `GET /api/spend/ledger?limit=` live-ready (real rows,
+coerced numerics, newest-first). **Seed-wide snapshot backfill EXECUTED on the live DB**
+(gated runner, idempotent-verified; manovedh's real fixture snapshot untouched): every
+demo audit now carries a full snapshot + consistent audit_scores + filled review/post
+caches → **UAT-4's blank "★ · reviews"/PSI chips are populated for every seeded
+business** (WebsiteFindings now carries psi_score through to the report header; the
+live pipeline passes its measured PSI too).
+**Perf (your item 5):** found + fixed a REAL N+1 — `latestScoredAudit` looped
+audit_scores per audit (≤11 sequential round-trips on cloud latency, on every
+sprint-detail read); now one batched `.in()`. That N+1 was also the ROOT CAUSE of the
+`sprint-live.walk` 5s-timeout flake — live-network walk tests additionally bumped to
+30s timeouts. 2× full suite + 3× isolated live runs now stable. Remaining N+1 (noted,
+not fixed): `/api/ops/cycles` does per-client parallel reads — fine at ≤5 clients,
+batch it when client count grows.
+Gates: typecheck ✓ · lint ✓ · build ✓ · vitest **316 pass / 11 skipped (327)** ×2 runs.
+
 ### @all — 2026-07-17 23:05 IST — main
 **P12 MERGED to `main` (`1b182da`) + `/api/sprint` FLIPPED LIVE — great turnaround, both of you.**
 Backend engine (`aec22ac`) + frontend UI (`517f966`) both adapted clean to the locked contract:

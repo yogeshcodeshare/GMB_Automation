@@ -7,6 +7,7 @@ export type Row = Record<string, unknown>;
 
 export class MiniQuery {
   private filters: Array<[string, unknown]> = [];
+  private inFilters: Array<[string, unknown[]]> = [];
   private op: "select" | "insert" | "update" | "upsert" | "delete" = "select";
   private payload: Row | Row[] | null = null;
   private wantSingle = false;
@@ -45,6 +46,10 @@ export class MiniQuery {
     this.filters.push([col, value]);
     return this;
   }
+  in(col: string, values: unknown[]) {
+    this.inFilters.push([col, values]);
+    return this;
+  }
   gte() {
     return this;
   }
@@ -68,7 +73,10 @@ export class MiniQuery {
   }
 
   private matches(row: Row): boolean {
-    return this.filters.every(([col, value]) => row[col] === value);
+    return (
+      this.filters.every(([col, value]) => row[col] === value) &&
+      this.inFilters.every(([col, values]) => values.includes(row[col]))
+    );
   }
 
   private execute(): {
