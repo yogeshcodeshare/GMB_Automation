@@ -36,7 +36,6 @@ export default function DashboardPage() {
     // UAT-3: consume the provider's businesses read — the page fetching
     // /api/businesses itself doubled the request on every dashboard mount.
     businesses: providerBusinesses,
-    businessesSource,
     businessesStatus: status,
     businessesError: error,
     retryBusinesses: retry,
@@ -264,9 +263,9 @@ export default function DashboardPage() {
                     >
                       {b.name}
                     </span>
-                    {/* UAT-2: demo rows are badged. Keyed off the list source
-                        until GET /api/businesses carries is_demo (HANDOFF ask). */}
-                    {businessesSource === "mock" && (
+                    {/* UAT-2: per-row DEMO badge off the contract is_demo flag
+                        (main 4715650) — real live rows are is_demo=false. */}
+                    {b.is_demo && (
                       <span className="flex-none rounded-[4px] bg-[#EEF1F4] px-[5px] py-[1px] text-[9px] font-bold tracking-[0.5px] text-[#8697A6]">
                         DEMO
                       </span>

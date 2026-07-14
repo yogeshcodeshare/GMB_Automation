@@ -4,8 +4,13 @@ import type { BusinessListItem } from "@/types";
  * Typed mock of `GET /api/businesses` — the 6 seed businesses (blueprint §2.9
  * / design-handoff XBIZ list). Scores + last-audit dates match the prototype's
  * P1 table exactly. Swapped for the real route on Day 5.
+ *
+ * Every seed row is `is_demo: true` — mirrors migration 20260713000002 (all
+ * six §2.9 seed businesses are demo data reaped by `flush:demo`). Real
+ * businesses the founder adds default is_demo=false and don't badge.
  */
-export const businessesMock: BusinessListItem[] = [
+export const businessesMock: BusinessListItem[] = (
+  [
   {
     id: "biz-manovedh",
     name: "मनोवेध हिप्नोक्लिनिक (संमोहन उपचार, NLP, EFT थेरपी)",
@@ -126,7 +131,8 @@ export const businessesMock: BusinessListItem[] = [
     latest_audit_at: "2026-06-19T12:00:00+05:30",
     sprint_delta: null,
   },
-];
+] satisfies BusinessListItem[]
+).map((b) => ({ ...b, is_demo: true }));
 
 /**
  * The Manovedh fixture business is identified by mock id (mock phase) OR the

@@ -26,11 +26,9 @@ import {
 export type PdfLang = PdfLanguage;
 
 interface AppState {
-  /** All businesses — live `/api/businesses` when flipped, mock fallback. */
+  /** All businesses — live `/api/businesses` when flipped, mock fallback.
+   *  DEMO badges key off each row's `is_demo` flag (contract, main 4715650). */
   businesses: BusinessListItem[];
-  /** Where the businesses list came from — "mock" rows are demo data (UAT-5
-   *  badges contacts sourced from them as DEMO). */
-  businessesSource: "live" | "mock";
   /** Query state of the provider's businesses read — consume THIS on pages
    *  instead of re-fetching /api/businesses (UAT-3: no double-fetch). */
   businessesStatus: MockQueryStatus;
@@ -126,7 +124,6 @@ export function AppStateProvider({
       businesses.find((b) => b.id === bizSelId) ?? businesses[0];
     return {
       businesses,
-      businessesSource: businessesQ.source,
       businessesStatus: businessesQ.status,
       businessesError: businessesQ.error,
       retryBusinesses: businessesQ.retry,
@@ -148,7 +145,6 @@ export function AppStateProvider({
     };
   }, [
     businesses,
-    businessesQ.source,
     businessesQ.status,
     businessesQ.error,
     businessesQ.retry,
