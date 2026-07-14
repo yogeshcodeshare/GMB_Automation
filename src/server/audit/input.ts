@@ -95,6 +95,9 @@ export interface WebsiteFindings {
   url: string;
   rented_subdomain: boolean;
   provider: string | null; // e.g. "grexa.site"
+  /** PSI mobile score when the audit ran it (pipeline website stage / demo
+   * generator); null = not measured. Surfaces as the report-header chip. */
+  psi_score?: number | null;
   nap: NapMatchRow[];
   title: { value: string | null; has_category: boolean; has_city: boolean };
   meta: {

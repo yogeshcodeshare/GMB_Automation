@@ -28,7 +28,7 @@ function websiteSummary(
   return {
     id: 0, // TB-013 row lands with the M1.5 crawler (EP-014)
     business_id: businessId,
-    psi_score: null,
+    psi_score: w.psi_score ?? null,
     title_ok: w.title.has_category && w.title.has_city,
     meta_ok: w.meta.has_category && w.meta.has_locality,
     h1_ok: w.heading_skips.length === 0,

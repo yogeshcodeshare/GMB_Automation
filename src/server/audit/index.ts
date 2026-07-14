@@ -12,3 +12,4 @@ export * from "./progress";
 export * from "./repo";
 export * from "./pipeline";
 export * from "./report";
+export * from "./demo";

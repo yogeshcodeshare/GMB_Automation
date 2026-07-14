@@ -5,12 +5,17 @@ import { makeSpendGuard } from "@/server/spend";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { createServiceClient } from "@/lib/supabase/server";
 import { startAudit } from "@/server/audit/pipeline";
+import { startDemoAudit } from "@/server/audit/demo";
 import { err, errFrom, ok, readJson } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
 interface ParsedBody {
   preview: boolean;
+  /** UAT-2: "demo" runs the synthetic pipeline — ₹0, no vendor, no live gate.
+   * Contract-proposal: AuditRequest.mode?: "live" | "demo" (parsed off the
+   * raw body until @/types lands it). */
+  mode: "live" | "demo";
   request: AuditRequest;
 }
 
@@ -18,6 +23,8 @@ function parseBody(raw: unknown): ParsedBody | string {
   if (typeof raw !== "object" || raw === null) return "JSON body required";
   const b = raw as Record<string, unknown>;
   const opts = (b.options ?? {}) as Record<string, unknown>;
+  const mode = b.mode ?? "live";
+  if (mode !== "live" && mode !== "demo") return 'mode must be "live" or "demo"';
 
   const competitors = opts.competitors ?? 3;
   if (competitors !== 3 && competitors !== 5) {
@@ -37,6 +44,13 @@ function parseBody(raw: unknown): ParsedBody | string {
     },
   };
 
+  if (mode === "demo") {
+    if (!request.business_id && !(request.name && request.city)) {
+      return "Demo mode needs name + city (or business_id)";
+    }
+    return { preview: request.preview === true, mode, request };
+  }
+
   const hasTarget =
     request.business_id ||
     request.cid ||
@@ -50,7 +64,7 @@ function parseBody(raw: unknown): ParsedBody | string {
   if (request.place_id && !request.cid && !request.business_id && !request.name) {
     return "A bare place_id cannot be audited — use the CID (Maps link shows both) or add name + city";
   }
-  return { preview: request.preview === true, request };
+  return { preview: request.preview === true, mode, request };
 }
 
 /** EP-001 — POST /api/audit: `{preview:true}` → CostPreview; else start the
@@ -58,7 +72,46 @@ function parseBody(raw: unknown): ParsedBody | string {
 export async function POST(req: Request) {
   const parsed = parseBody(await readJson(req));
   if (typeof parsed === "string") return err("VALIDATION_ERROR", parsed);
-  const { preview, request } = parsed;
+  const { preview, mode, request } = parsed;
+
+  // UAT-2 demo mode: synthetic pipeline — no live gate, no spend, ₹0.
+  if (mode === "demo") {
+    if (preview) {
+      return ok({
+        estimated_cost_usd: 0,
+        estimated_cost_inr: 0,
+        breakdown: [{ item: "demo mode — synthetic data, no vendor calls", cost_usd: 0 }],
+      } satisfies CostPreview);
+    }
+    try {
+      const started = await startDemoAudit(
+        { db: createServiceClient() },
+        {
+          business_id: request.business_id,
+          name: request.name,
+          city: request.city,
+        }
+      );
+      started.done.catch(() => undefined); // progress carries any failure
+      return ok(
+        {
+          audit_id: started.audit_id,
+          stage: "profile" as const,
+          done_stages: [],
+          status: "running" as const,
+        },
+        202
+      );
+    } catch (e) {
+      if (e instanceof Error && e.message === "NOT_FOUND") {
+        return err("NOT_FOUND", "business_id not found");
+      }
+      if (e instanceof Error && e.message.startsWith("VALIDATION:")) {
+        return err("VALIDATION_ERROR", e.message.slice("VALIDATION:".length));
+      }
+      return errFrom(e);
+    }
+  }
 
   const estimate = auditEstimateUsd(request.options);
   if (preview) {

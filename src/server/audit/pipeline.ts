@@ -378,7 +378,7 @@ async function runStages(
         psiMobileScore(profile.website),
       ]);
       if (outcome.reachable && outcome.findings) {
-        website = outcome.findings;
+        website = { ...outcome.findings, psi_score: psi };
         await insertWebsiteAudit(db, businessId, {
           psi_score: psi,
           title_ok: website.title.has_category && website.title.has_city,
