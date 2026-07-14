@@ -26,6 +26,9 @@ export type PdfLang = PdfLanguage;
 interface AppState {
   /** All businesses — live `/api/businesses` when flipped, mock fallback. */
   businesses: BusinessListItem[];
+  /** Where the businesses list came from — "mock" rows are demo data (UAT-5
+   *  badges contacts sourced from them as DEMO). */
+  businessesSource: "live" | "mock";
   /** Globally selected business (drives workspace screens). */
   bizSel: BusinessListItem;
   setBizSelId: (id: string) => void;
@@ -116,6 +119,7 @@ export function AppStateProvider({
       businesses.find((b) => b.id === bizSelId) ?? businesses[0];
     return {
       businesses,
+      businessesSource: businessesQ.source,
       bizSel,
       setBizSelId,
       bizSelIsFixture: isFixtureBusiness(bizSel.id),
@@ -134,6 +138,7 @@ export function AppStateProvider({
     };
   }, [
     businesses,
+    businessesQ.source,
     bizSelId,
     capPreview,
     catApplied,
