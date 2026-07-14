@@ -20,6 +20,40 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-18 19:50 IST — frontend
+**Review request: Day-7 UAT fixes + demo-mode UI + full sweep — 4 commits on `agents/frontend`.**
+
+- **`746d15b` UAT-1/4/5/7** (merge-ready first): PDF error toast w/ server message + auto-open +
+  persistent "Open PDF ↗" chip that HEAD-probes and re-requests EP-006 on 4xx expiry; WA modal
+  fake chips REMOVED (real `owner_whatsapp` contacts only, DEMO-badged when demo-sourced, owner
+  prefill, true empty state); settings switch knob anchored `left-0` (was overflowing — verified
+  3/23px insets both states) + focus ring; report header chips hide/em-dash on missing snapshot
+  fields. *Verified live: 401 path renders "PDF failed — Founder login required." — please walk
+  the SUCCESS + expiry branches on an authed founder session (harness is unauthenticated).*
+- **`b38bf0f` UAT-3 perf**: dashboard was double-fetching `/api/businesses` (its own hook on top
+  of the provider's) → provider query state now exposed + consumed; mock-fallback delay 400→100ms;
+  Leaflet already dynamic. **Verdicts:** double-fetch = FIXED (2 req/mount dev = StrictMode pair,
+  1 in prod); "slow screens" were dev-only first-hit compiles (login 48.6s cold in `next dev`);
+  prod build: /login 12–16ms warm, first-load JS 88–125kB per screen. **@Yogesh: client UAT should
+  run `npm run build && npm start`, not `next dev`.** `/public/dev` 404s in prod (guard verified).
+- **`25bc789` UAT-2 demo mode** (locked contract): Search enabled + labeled synthetic candidates
+  w/ DEMO badges while live-off; "Run demo audit →" + ₹0 preview + badged staged run; EP-001 body
+  sends `mode:"demo"/"live"`; P3 persistent DEMO DATA banner off `source/is_demo` (mock now carries
+  both); dashboard-row DEMO chip. Also folds MAIN's UAT-1 message spec (FEATURE_DISABLED → "restart
+  the server"; no fake sent-chips on live WA/report failures).
+- **`8532da8` sweep**: client-asked full control walk — Workflow'd 61-agent audit, 48 raw → **36
+  adversarially-confirmed findings, ALL fixed** (12 refuted stayed untouched). Highlights: P2
+  Enter-key bypassed the paid-search gates (HIGH); P4 modal search + P8 category search unwired
+  (HIGH/MED); P11 guard inputs ignored the LIVE settings response + save toasted success on
+  failures (HIGH/MED); P9 stale clientId↔cycle pairing; OSM attribution same-tab escape; ~20
+  hardcoded fixture literals moved to mocks/computed. Full finding list in the workflow output —
+  EOD report has the checklist. 12-screen post-fix smoke: all render, 0 console errors.
+
+**Contract asks:** (a) add `is_demo: boolean` to `Business`/`BusinessListItem` (DB column exists
+per your UAT-6 note) so dashboard rows + WA-contact DEMO badges key per-row instead of off the
+list source; (b) `AiGenerateRequest` fb_post: optional `audience?: "customers"|"local_community"`
+(currently folded into `topic`). Gates: typecheck 0 · full lint clean · build ✓ (route table green).
+
 ### @all — 2026-07-18 09:30 IST — main
 **Day-7 UAT fixes are priority #1 (before new scope). Triage + contract + gate below.**
 
