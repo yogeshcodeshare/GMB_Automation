@@ -20,6 +20,33 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @all — 2026-07-18 09:30 IST — main
+**Day-7 UAT fixes are priority #1 (before new scope). Triage + contract + gate below.**
+
+**🐛 UAT-1 — PDF "download failure" (@frontend fix + @Yogesh restart). Root-caused, repro'd.**
+Two things: (1) **@Yogesh restart `npm run dev`** — Next reads `.env.local` only at startup, so
+the late `FEATURE_PDF=on` never reached your running process → EP-006 returned `FEATURE_DISABLED`
+(direct-handler repro: `tests/report-feature-disabled.repro.test.ts`). (2) **@frontend real bug:**
+`genPdf` (report/page.tsx:166-176) toasts **"PDF ready" on ANY failure** — the fake success that
+made UAT confusing. **Require a clear error toast on every failure** (special-case `FEATURE_DISABLED`
+→ "PDF generation is off — restart the server", other codes → "Couldn't generate the PDF — <reason>").
+Never show "PDF ready" unless `r.ok && storage_url`. Same for the WA send path.
+
+**📐 UAT-2 — EP-001 `mode: "live"|"demo"` LOCKED (see API_CONTRACT "EP-001 demo mode").** @backend
+builds the demo branch: full pipeline vs a **deterministic synthetic generator** (the `a1111111`
+backfill pattern generalized — fixture input → `buildSnapshot`), **zero vendor calls / zero spend**,
+persist `is_demo=true` + snapshot `source:"demo"`. EP-002 surfaces `AuditReport.source`/`is_demo`
+(both now in `@/types`, optional during rollout — populate them). @frontend: New Audit sends
+`mode:"demo"` while CR-1 is OFF; badge "Demo data" when `source==="demo"`. **This also closes UAT-4**
+(seed-wide backfill = demo audits). **SEC — I gate all three on merge:** no DataForSEO client in the
+demo branch (poisoned-fetch test), `is_demo=true`, `spend_ledger` unchanged. **EP-014 confirmed
+free/ungated** (crawler + free PSI, no vendor/CR-1/spend) — no change needed.
+
+**🧹 UAT-6 — junk rows cleaned + guard shipped.** Deleted the 2 orphan मनोवेध rows (place_id NULL,
+is_demo=false — from failed by-name audit attempts) from the cloud DB → back to 6 seed businesses.
+**@Yogesh apply migration `20260718000001`** (partial unique index on place_id + cid — prevents live
+dup businesses). Forward-prevention: demo-mode `is_demo=true` lets `flush:demo` reap any test row.
+
 ### @all — 2026-07-17 23:05 IST — main
 **P12 MERGED to `main` (`1b182da`) + `/api/sprint` FLIPPED LIVE — great turnaround, both of you.**
 Backend engine (`aec22ac`) + frontend UI (`517f966`) both adapted clean to the locked contract:

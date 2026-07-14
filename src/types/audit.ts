@@ -110,9 +110,22 @@ export interface HoursDay {
 }
 
 /** EP-002 response — everything P3 Audit Report renders. */
+/**
+ * UAT-2 — audit provenance. "live" runs the DataForSEO pipeline (CR-1 must be ON, costs
+ * spend); "demo" runs the SAME pipeline against a deterministic synthetic generator —
+ * ZERO vendor calls, ZERO spend, persisted `is_demo=true`. Demo is the fallback the UI
+ * uses while live data is OFF, so every screen works on realistic data and badges it.
+ */
+export type AuditMode = "live" | "demo";
+
 export interface AuditReport {
   business: Business;
   audit: Audit;
+  /** Provenance surfaced so every screen can badge "Demo data" (UAT-2). Optional during
+   *  rollout (absent → treat as "live"); backend populates it on every EP-002 response. */
+  source?: AuditMode;
+  /** Mirrors business.is_demo — demo audits set it true. */
+  is_demo?: boolean;
   scores: AuditScores;
   band: ScoreBand;
   rubric: RubricRow[];
@@ -146,6 +159,9 @@ export interface CompetitorCompareRow {
 /** EP-001 request. */
 export interface AuditRequest {
   preview?: boolean; // true → CostPreview, nothing runs
+  /** UAT-2 — default "live". "demo" runs the synthetic pipeline (₹0, no vendor calls,
+   *  is_demo=true, source="demo"); allowed even when CR-1 live-data is OFF. */
+  mode?: AuditMode;
   business_id?: string; // re-audit an existing business
   name?: string; // or resolve by name+city
   city?: string;

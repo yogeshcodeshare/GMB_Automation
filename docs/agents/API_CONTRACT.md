@@ -34,8 +34,8 @@ All type names below live in `src/types/` (import from `@/types`).
 
 | ID | Method + Route | Request type | Response `data` type | Milestone |
 |---|---|---|---|---|
-| EP-001 | `POST /api/audit` | `AuditRequest` | `CostPreview` \| `AuditProgress` | M1 |
-| EP-002 | `GET /api/audit/:id` | — | `AuditReport` | M1 |
+| EP-001 | `POST /api/audit` | `AuditRequest` (+ `mode?: "live"\|"demo"`) | `CostPreview` \| `AuditProgress` | M1 · UAT-2 |
+| EP-002 | `GET /api/audit/:id` | — | `AuditReport` (+ `source: "live"\|"demo"`, `is_demo`) | M1 · UAT-2 |
 | — | `GET /api/audit/:id/progress` | — | `AuditProgress` (poll for P2 staged UI) | M1 |
 | EP-003 | `POST /api/grid` | `GridScanRequest` | `CostPreview` \| `GridScan` (queued) | M2 |
 | EP-004 | `GET /api/grid/:id` | — | `GridScanResult` \| `TeleportResult` (grid_size 1) | M2 |
@@ -50,7 +50,7 @@ All type names below live in `src/types/` (import from `@/types`).
 | EP-011 | `POST /api/gbp/post` · `POST /api/gbp/reply` | `{ business_id; ai_output_id }` | `{ published: true; gbp_ref: string }` (flag off → FEATURE_DISABLED) | M6 |
 | EP-012 | `GET /api/spend/today` | — | `SpendToday` | **M0 ✅** |
 | EP-013 | `POST /api/posts-audit` | `{ preview?; business_id }` | `CostPreview` \| `{ stats: PostAuditStats; posts: PostItem[]; timeline: PostTimelineBucket[] }` | M1 |
-| EP-014 | `POST /api/website-audit` | `{ preview?; business_id }` | `CostPreview` \| `WebsiteAuditDetail` (`summary.psi_desktop?` optional) | M1.5 |
+| EP-014 | `POST /api/website-audit` | `{ preview?; business_id }` | `CostPreview` \| `WebsiteAuditDetail` (`summary.psi_desktop?` optional) — **free/ungated: crawler + free PSI, zero vendor calls, no CR-1/spend gate (confirmed UAT-2)** | M1.5 |
 | EP-015 | `GET /api/categories/related?kw=` | — | `CategoryIntel` | M1 |
 | EP-016 | `GET /api/gbp/keywords/:businessId` | — | `Array<{ keyword: string; impressions: number }>` | M6 |
 | EP-017 | `POST /api/media/inbox` (n8n webhook, secret header) · `POST /api/gbp/media/:id/publish` | — | `MediaInboxItem` · `{ published: true }` | M9 |
@@ -105,6 +105,29 @@ edit by hand → log `change_before`/`change_after`. Enforced by contract + thes
 **Requires client migration `20260717000001_sprint_p12_hardening.sql`** (4 `fix_tasks`
 columns + baseline NOT NULL + one-active index + immutability trigger) before the backend
 endpoints run live. UAT tonight uses seed data (defaults apply) — not blocked.
+
+### EP-001 demo mode — LOCKED (UAT-2; types in `@/types` `audit.ts`)
+
+`AuditRequest.mode` (default `"live"`) selects provenance; the UI sends `"demo"` whenever CR-1
+live-data is OFF so New Audit always produces realistic, badge-able data:
+
+1. **`mode:"demo"` = full pipeline, synthetic input.** The backend runs the SAME scoring
+   pipeline (`buildSnapshot → insertAudit/Scores`) against a **deterministic, fixture-derived
+   synthetic generator** (varied per business name/seed; reproducible) — never `makeDataForSeoClient`.
+   Persist `businesses.is_demo=true` + snapshot `source:"demo"`. Cost preview = **₹0**.
+2. **`mode:"live"` = current behaviour** — `assertLiveDataEnabled` (CR-1 gate → `LIVE_DATA_DISABLED`
+   503 when OFF) + spend guard + DataForSEO. Unchanged.
+3. **EP-002 surfaces provenance:** `AuditReport.source` (`"live"|"demo"`) + `is_demo` → every
+   screen badges "Demo data". Map snapshot `source`: `dataforseo→live`, `demo|fixture→demo`.
+4. **SEC posture (demo path) — I gate on all three:** (a) **ZERO vendor calls** — the demo branch
+   must not construct/call the DataForSEO client (prove with a poisoned-`fetch` test, sprint-engine
+   style); (b) **`is_demo=true`** on the business so `flush:demo` reaps it (audits cascade-delete);
+   (c) **ZERO spend** — skip the spend guard, assert `spend_ledger` unchanged after a demo audit.
+5. **EP-014 website audit stays free/ungated** — crawler + free PSI only, no vendor/CR-1/spend
+   gate (confirmed). Website-only audits work regardless of `mode`.
+
+@backend: the demo generator IS the `a1111111` backfill pattern generalized (fixture input →
+`buildSnapshot`) — reuse it, and it also closes UAT-4 (seed-wide backfill = demo audits).
 
 ## Error examples
 
