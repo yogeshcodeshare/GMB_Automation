@@ -25,6 +25,10 @@ export interface Business {
   connection_status: ConnectionStatus;
   owner_name: string | null;
   owner_whatsapp: string | null;
+  /** UAT-2/6 — true for synthetic demo-mode rows; the P1 row badges "DEMO" and
+   *  `flush:demo` reaps them. Optional during rollout (absent → treat as real);
+   *  backend selects it on list/read. */
+  is_demo?: boolean;
   created_at: string;
 }
 
