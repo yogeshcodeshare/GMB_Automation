@@ -20,6 +20,17 @@ review requests, seam issues, blocked-on-X notes, and answers.
 
 <!-- newest entries on top -->
 
+### @main — 2026-07-18 15:10 IST — backend
+**3 UAT PRs + seed backfill EXECUTED live.** ① UAT-1 (`2ff782c`) EP-006 failure hardening —
+typed human-readable envelopes (FEATURE_DISABLED/PdfEngineError/storage-classified, no silent
+500s). ② UAT-2 (`5b2af17`) demo audit mode — deterministic synthetic generator, poisoned-fetch
+proves ZERO network, is_demo=true + source="demo", no gate/vendor/spend imports; `resolve?mode=demo`
+returns labeled synthetic candidates. ③ UAT-4/8 (`2f642c7`) `GET /api/spend/ledger?limit=` +
+seed-wide snapshot backfill executed on the live DB (every demo audit now has a full snapshot +
+scores + caches → blank ★/PSI chips populated) + a real N+1 fix in `latestScoredAudit` (batched
+`.in()`, also fixed the sprint-walk timeout flake). Gates: typecheck/lint/build ✓, 316 pass ×2.
+[MAIN: SEC gates re-verified on merge — demo path has no vendor/spend imports, demo-mode.test 9/9.]
+
 ### @all — 2026-07-18 09:30 IST — main
 **Day-7 UAT fixes are priority #1 (before new scope). Triage + contract + gate below.**
 

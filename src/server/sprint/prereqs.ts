@@ -27,25 +27,36 @@ export async function latestScoredAudit(
     .order("created_at", { ascending: false })
     .limit(10);
   if (error) throw new Error(`audits read failed: ${error.message}`);
-  for (const audit of auditRows ?? []) {
-    if (opts.excludeId && audit.id === opts.excludeId) continue;
-    if (
-      opts.sinceIso &&
-      Date.parse(audit.created_at as string) < Date.parse(opts.sinceIso)
-    ) {
-      continue; // rows are newest-first: everything after this is older too
-    }
-    const { data: scores, error: sErr } = await db
-      .from("audit_scores")
-      .select("total")
-      .eq("audit_id", audit.id)
-      .maybeSingle();
-    if (sErr) throw new Error(`audit_scores read failed: ${sErr.message}`);
-    if (scores?.total !== undefined && scores?.total !== null) {
-      return { id: audit.id as string, created_at: audit.created_at as string };
-    }
-  }
-  return null;
+
+  const candidates = (auditRows ?? []).filter(
+    (audit) =>
+      !(opts.excludeId && audit.id === opts.excludeId) &&
+      !(
+        opts.sinceIso &&
+        Date.parse(audit.created_at as string) < Date.parse(opts.sinceIso)
+      )
+  );
+  if (candidates.length === 0) return null;
+
+  // ONE batched scores lookup instead of a per-audit loop (UAT perf: on
+  // cloud latency the old N+1 alone could eat seconds per detail read).
+  const { data: scoreRows, error: sErr } = await db
+    .from("audit_scores")
+    .select("audit_id, total")
+    .in(
+      "audit_id",
+      candidates.map((a) => a.id as string)
+    );
+  if (sErr) throw new Error(`audit_scores read failed: ${sErr.message}`);
+  const scored = new Set(
+    (scoreRows ?? [])
+      .filter((s) => s.total !== undefined && s.total !== null)
+      .map((s) => s.audit_id as string)
+  );
+  const hit = candidates.find((a) => scored.has(a.id as string));
+  return hit
+    ? { id: hit.id as string, created_at: hit.created_at as string }
+    : null;
 }
 
 /** Newest finished grid scan (locked as baseline_grid_id at create). */

@@ -2,6 +2,7 @@ import type { BusinessCandidate, CostPreview } from "@/types";
 import { COST_USD, toInr } from "@/server/costs";
 import { createServiceClient } from "@/lib/supabase/server";
 import { assertLiveDataEnabled } from "@/server/settings/live-flag";
+import { demoCandidatesFor } from "@/server/audit/demo";
 import { makeDataForSeoClient } from "@/server/dataforseo";
 import { resolveBusiness } from "@/server/audit/pipeline";
 import { err, errFrom, ok } from "@/server/http";
@@ -20,6 +21,11 @@ export async function GET(req: Request) {
   }
   if (name.length > 120 || city.length > 60) {
     return err("VALIDATION_ERROR", "name/city too long");
+  }
+
+  // UAT-2: demo mode returns labeled synthetic candidates — no gate, ₹0.
+  if (params.get("mode") === "demo") {
+    return ok(demoCandidatesFor(name, city));
   }
 
   if (params.get("preview") === "1") {
