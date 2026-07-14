@@ -67,6 +67,8 @@ export type AiGenerateRequest =
       topic: string;
       emoji_level: "none" | "some" | "festive";
       include_gbp_link: boolean;
+      /** Optional targeting (was folded into `topic`); default "customers". */
+      audience?: "customers" | "local_community";
     }
   | {
       tool: "festival";
